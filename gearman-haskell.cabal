@@ -18,6 +18,7 @@ cabal-version:       >=1.10
 
 library
   build-depends:       base >=4.6 && <4.7,
-                       data-endian
+                       data-endian,
+                       bytestring
   hs-source-dirs:      src
   default-language:    Haskell2010
