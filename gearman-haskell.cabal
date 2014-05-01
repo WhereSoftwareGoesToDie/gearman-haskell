@@ -3,7 +3,7 @@
 
 name:                gearman-haskell
 version:             0.1.0.0
-synopsis:            Haskell bindings to libgearman.
+synopsis:            Haskell implementation of the Gearman protocol.
 -- description:         
 homepage:            https://github.com/anchor/gearman-haskell
 license:             MIT

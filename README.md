@@ -1,4 +1,4 @@
 gearman-haskell
 ===============
 
-Haskell bindings to libgearman
+Haskell implementation of the Gearman protocol.
