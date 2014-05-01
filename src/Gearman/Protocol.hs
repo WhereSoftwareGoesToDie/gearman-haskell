@@ -1,6 +1,19 @@
-module Gearman.Protocol where
+module Gearman.Protocol
+(
+    PacketMagic
+    PacketDomain
+    PacketType
+    PacketHeader
+) where
 
-data PacketMagic = Req | Res | Unused
+import Data.ByteString as S
+
+data PacketMagic = Req | Res | Unused 
+
+renderMagic :: PacketMagic -> ByteString
+renderMagic Req = S.pack "REQ\0"
+renderMagic Rep = S.pack "REP\0"
+renderMagic Unused = S.pack ""
 
 data PacketDomain = Client | Worker | Both | None
 
