@@ -13,9 +13,9 @@ import Data.ByteString.Char8 as S
 data PacketMagic = Req | Res | Unused 
 
 renderMagic :: PacketMagic -> ByteString
-renderMagic Req = S.pack "REQ\0"
-renderMagic Res = S.pack "REP\0"
-renderMagic Unused = S.pack ""
+renderMagic Req = "REQ\0"
+renderMagic Res = "REP\0"
+renderMagic Unused = ""
 
 data PacketDomain = Client | Worker | Both | None
 
