@@ -21,6 +21,9 @@ library
                        data-endian,
                        bytestring,
                        binary,
-                       trifecta
+                       trifecta,
+                       mtl,
+                       HTTP,
+                       network
   hs-source-dirs:      src
   default-language:    Haskell2010
