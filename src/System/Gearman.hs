@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Gearman where
+module System.Gearman where
 
-import Gearman.Protocol
+import System.Gearman.Protocol
 
 
