@@ -4,20 +4,26 @@ module System.Gearman.Error
 (
     GearmanError,
     WorkerError
+    gearmanError
 ) where
 
-import Data.ByteString.Lazy
+import qualified Data.ByteString.Lazy as S
+import Data.String
+import Data.Int
 
-data ErrorCode = ErrorCode ByteString deriving (Show)
+data ErrorCode = ErrorCode Int32 deriving (Show)
 
-data ErrorMessage = ErrorMessage ByteString deriving (Show)
+data ErrorMessage = ErrorMessage S.ByteString
 
 data GearmanError = GearmanError {
-    code :: ErrorCode,
-    message :: ErrorMessage
+    code :: !ErrorCode,
+    message :: !ErrorMessage
 }
 
 data WorkerError = WorkerError {
-    error :: ErrorMessage,
-    fn    :: ByteString
+    error :: !ErrorMessage,
+    fn    :: !S.ByteString
 }
+
+gearmanError :: Int32 -> [Char] -> GearmanError
+gearmanError code msg = GearmanError (ErrorCode code) (ErrorMessage (fromString msg))
