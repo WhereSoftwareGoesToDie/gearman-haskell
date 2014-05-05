@@ -3,7 +3,7 @@
 module System.Gearman.Error
 (
     GearmanError,
-    WorkerError
+    WorkerError,
     gearmanError
 ) where
 
