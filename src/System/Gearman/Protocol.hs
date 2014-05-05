@@ -252,7 +252,7 @@ packData d          = runPut $ do
     putWord32be $ fromIntegral $ S.length (toPayload d)
     putLazyByteString $ toPayload d
   where
-    toPayload = S.intercalate "\0"
+    toPayload s = S.append (S.intercalate "\0" s) "\0"
 
 buildEchoReq        :: [S.ByteString] -> S.ByteString
 buildEchoReq        = (S.append (renderHeader echoReq)) . packData
