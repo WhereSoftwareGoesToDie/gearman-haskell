@@ -246,9 +246,13 @@ submitJobEpoch      :: PacketHeader
 submitJobEpoch      = PacketHeader SubmitJobEpoch Req Client
 
 -- | packData takes a list of message parts (ByteStrings) and concatenates 
---   them with null bytes in between.
+--   them with null bytes in between and the length in front.
 packData            :: [S.ByteString] -> S.ByteString
-packData            = S.append "\0" . (S.intercalate "\0")
+packData d          = runPut $ do
+    putWord32be $ fromIntegral $ S.length (toPayload d)
+    putLazyByteString $ toPayload d
+  where
+    toPayload = S.append "\0" . (S.intercalate "\0")
 
 buildEchoReq        :: [S.ByteString] -> S.ByteString
 buildEchoReq        = (S.append (renderHeader echoReq)) . packData
