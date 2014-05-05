@@ -1,7 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module System.Gearman.Connection where
+module System.Gearman.Connection(
+    Connection,
+    connect,
+    echo
+) where
 
 import Prelude hiding (length)
 import Control.Monad
