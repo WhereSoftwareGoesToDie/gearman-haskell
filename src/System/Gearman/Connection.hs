@@ -15,7 +15,7 @@ import GHC.IO.Handle
 import System.Gearman.Error
 
 data Connection = Connection {
-    h :: Handle
+    sock :: N.Socket
 }
 
 getHostAddress :: String -> Word16 -> IO N.AddrInfo
@@ -27,9 +27,9 @@ getHostAddress host port = do
   where
     hints = Just $ N.defaultHints { N.addrProtocol = (fromIntegral port) }
 
-connect :: String -> Word16 -> IO N.Socket
+connect :: String -> Word16 -> IO Connection
 connect host port = do
     sock <- N.socket N.AF_INET N.Datagram N.defaultProtocol
     ai <- getHostAddress host port
     N.connect sock $ N.addrAddress $ ai
-    return sock
+    return (Connection sock)
