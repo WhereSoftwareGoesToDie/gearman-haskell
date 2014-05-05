@@ -9,5 +9,6 @@ install:
 script:
   - 'cabal configure'
   - 'cabal build'
+  - 'cabal install'
   - 'cabal test'
   - 'cabal sdist'
