@@ -9,6 +9,9 @@ env:
   - 'UBUNTU_RELEASE=saucy GHCVER=7.6.3 CABALVER=1.20'
   - 'UBUNTU_RELEASE=saucy GHCVER=7.8.1 CABALVER=1.20'
 
+before_install:
+  - 'sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER happy'
+
 install:
   - 'cabal-$CABALVER update'
   - 'cabal-$CABALVER install --only-dependencies --enable-tests --enable-benchmarks'
