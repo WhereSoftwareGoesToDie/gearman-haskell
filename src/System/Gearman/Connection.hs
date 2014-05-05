@@ -10,7 +10,7 @@ import Control.Monad.Trans
 import Control.Monad.State.Class
 import qualified Network.Socket as N
 import Network.Socket.ByteString
-import Data.ByteString.Lazy as S
+import Data.ByteString.Char8 as S
 import Data.Word
 import Data.Int
 import Data.String
@@ -51,11 +51,11 @@ connect host port = do
 echo :: Connection -> IO (Maybe GearmanError)
 echo Connection{..} = do
     sent <- send sock $ lazyToChar8 req
-    let expected = fromIntegral (length req)  
+    let expected = fromIntegral (length $ lazyToChar8 $ req)  
     case () of _
                  | (sent == expected) -> do
                    rep <- recv sock 8
-                   case (length $ lazyToChar8 rep) of 
+                   case (S.length $ rep) of 
                        8 -> return Nothing
                        x -> return $ Just $ recvError x
                  | otherwise          -> return $ Just $ sendError sent
