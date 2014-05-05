@@ -61,8 +61,8 @@ import Control.Monad
 data PacketMagic = Req | Res | Unused 
 
 renderMagic :: PacketMagic -> S.ByteString
-renderMagic Req = "REQ\0"
-renderMagic Res = "REP\0"
+renderMagic Req = "\0REQ"
+renderMagic Res = "\0REP"
 renderMagic Unused = ""
 
 data PacketDomain = Client | Worker | Both | None
