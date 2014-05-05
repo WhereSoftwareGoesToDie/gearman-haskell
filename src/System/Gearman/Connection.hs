@@ -35,6 +35,7 @@ getHostAddress host port = do
   where
     hints = Just $ N.defaultHints { N.addrProtocol = (fromIntegral port) }
 
+-- | connect attempts to connect to the supplied hostname and port.
 connect :: String -> Word16 -> IO (Either GearmanError Connection)
 connect host port = do
     sock <- N.socket N.AF_INET N.Datagram N.defaultProtocol
@@ -45,6 +46,8 @@ connect host port = do
             N.connect sock $ N.addrAddress x 
             return $ Right $ Connection sock
 
+-- | echo tests a Connection by sending (and waiting for a response to) an
+--   echo packet. 
 echo :: Connection -> IO (Maybe GearmanError)
 echo Connection{..} = do
     sent <- send sock $ lazyToChar8 req
