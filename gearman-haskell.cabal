@@ -17,6 +17,10 @@ extra-source-files:  README.md
 cabal-version:       >=1.10
 
 library
+  exposed-modules:     System.Gearman
+                       System.Gearman.Error
+                       System.Gearman.Connection
+                       System.Gearman.Util
   build-depends:       base >=4.6 && <4.7,
                        data-endian,
                        bytestring,

@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
-module Gearman.Connection where
+module System.Gearman.Connection where
 
+import Prelude hiding (length)
 import Control.Monad
 import Control.Applicative
 import Control.Monad.Trans
@@ -17,6 +19,8 @@ import Foreign.C.Types
 import GHC.IO.Handle
 
 import System.Gearman.Error
+import System.Gearman.Protocol
+import System.Gearman.Util
 
 data Connection = Connection {
     sock :: N.Socket
@@ -36,7 +40,17 @@ connect host port = do
     sock <- N.socket N.AF_INET N.Datagram N.defaultProtocol
     ai <- getHostAddress host port
     case ai of 
-        Nothing -> return $ Left $ GearmanError 1 (fromString ("could not resolve address" ++ host))
+        Nothing -> return $ Left $ gearmanError 1 (fromString ("could not resolve address" ++ host))
         Just x  -> do
             N.connect sock $ N.addrAddress x 
             return $ Right $ Connection sock
+
+echo :: Connection -> IO (Maybe GearmanError)
+echo Connection{..} = do
+    sent <- send sock $ lazyToChar8 req
+    let expected = fromIntegral (length req)  
+    case () of _
+                 | (sent == expected) -> return Nothing
+                 | otherwise          -> return $ Just $ gearmanError 2 ("echo failed: only sent " ++ (show sent) ++ " bytes")
+  where
+    req = renderHeader echoReq
