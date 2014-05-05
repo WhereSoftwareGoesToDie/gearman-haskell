@@ -30,24 +30,28 @@ data Connection = Connection {
     sock :: N.Socket
 }
 
-getHostAddress :: String -> Word16 -> IO (Maybe N.AddrInfo)
+getHostAddress :: String -> String -> IO (Maybe N.AddrInfo)
 getHostAddress host port = do
-    ai <- N.getAddrInfo hints (Just host) Nothing
+    ai <- N.getAddrInfo hints (Just host) (Just port)
     case ai of 
         (x:_) -> return $ Just x
         [] -> return Nothing
   where
-    hints = Just $ N.defaultHints { N.addrProtocol = (fromIntegral port) }
+    hints = Just $ N.defaultHints { 
+        N.addrProtocol = 6,
+        N.addrFamily   = N.AF_INET,
+        N.addrFlags    = [ N.AI_NUMERICSERV ]
+    }
 
 -- | connect attempts to connect to the supplied hostname and port.
-connect :: String -> Word16 -> IO (Either GearmanError Connection)
+connect :: String -> String -> IO (Either GearmanError Connection)
 connect host port = do
     sock <- N.socket N.AF_INET N.Datagram N.defaultProtocol
     ai <- getHostAddress host port
     case ai of 
         Nothing -> return $ Left $ gearmanError 1 (fromString ("could not resolve address" ++ host))
         Just x  -> do
-            N.connect sock $ N.addrAddress x 
+            N.connect sock $ (N.addrAddress x)
             return $ Right $ Connection sock
 
 -- | echo tests a Connection by sending (and waiting for a response to) an

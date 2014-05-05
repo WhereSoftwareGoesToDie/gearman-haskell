@@ -12,8 +12,8 @@ data Gearman a = Gearman {
     conn :: Connection
 }
 
-testConnect :: String -> Word16 -> IO (Maybe GearmanError)
-testConnect h p = do
+testConnectEcho :: String -> String -> IO (Maybe GearmanError)
+testConnectEcho h p = do
     c <- connect h p
     case c of 
         Left x  -> return $ Just x
