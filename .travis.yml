@@ -3,10 +3,10 @@ before_install:
   - 'sudo apt-get install cabal-install ghc happy'
 
 install:
-  - 'cabal-$CABALVER update'
-  - 'cabal-$CABALVER install --only-dependencies --enable-tests --enable-benchmarks'
+  - 'cabal update'
+  - 'cabal install --only-dependencies --enable-tests --enable-benchmarks'
 
 script:
-  - 'cabal-$CABALVER configure'
-  - 'cabal-$CABALVER build'
-  - 'cabal-$CABALVER sdist'
+  - 'cabal configure'
+  - 'cabal build'
+  - 'cabal sdist'
