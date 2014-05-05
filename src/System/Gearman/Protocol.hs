@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
-module Gearman.Protocol
+module System.Gearman.Protocol
 (
     PacketMagic,
     PacketDomain,
@@ -8,11 +9,13 @@ module Gearman.Protocol
     PacketHeader
 ) where
 
-import Data.ByteString.Char8 as S
+import Data.ByteString.Lazy as S
+import Data.Binary.Put
+import Control.Monad
 
 data PacketMagic = Req | Res | Unused 
 
-renderMagic :: PacketMagic -> ByteString
+renderMagic :: PacketMagic -> S.ByteString
 renderMagic Req = "REQ\0"
 renderMagic Res = "REP\0"
 renderMagic Unused = ""
@@ -63,6 +66,12 @@ data PacketHeader = PacketHeader {
     magic      :: PacketMagic,
     domain     :: PacketDomain
 }
+
+renderHeader :: PacketHeader -> S.ByteString
+renderHeader PacketHeader{..} =
+    runPut $ do 
+        putLazyByteString (renderMagic magic) 
+        (putWord32be . fromIntegral . fromEnum) packetType
 
 canDo               :: PacketHeader
 canDo               = PacketHeader CanDo Req Worker
