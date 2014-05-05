@@ -53,7 +53,13 @@ echo Connection{..} = do
     sent <- send sock $ lazyToChar8 req
     let expected = fromIntegral (length req)  
     case () of _
-                 | (sent == expected) -> return Nothing
-                 | otherwise          -> return $ Just $ gearmanError 2 ("echo failed: only sent " ++ (show sent) ++ " bytes")
+                 | (sent == expected) -> do
+                   rep <- recv sock 8
+                   case (length $ lazyToChar8 rep) of 
+                       8 -> return Nothing
+                       x -> return $ Just $ recvError x
+                 | otherwise          -> return $ Just $ sendError sent
   where
     req = renderHeader echoReq
+    sendError b = gearmanError 2 ("echo failed: only sent " ++ (show b) ++ " bytes")
+    recvError b = gearmanError 3 ("echo failed: only received " ++ (show b) ++ " bytes")

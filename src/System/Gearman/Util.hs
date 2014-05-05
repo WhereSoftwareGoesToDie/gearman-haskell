@@ -1,4 +1,6 @@
-module System.Gearman.Util where
+module System.Gearman.Util(
+    lazyToChar8
+) where
 
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as BC
