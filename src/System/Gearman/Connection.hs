@@ -14,7 +14,7 @@ import Control.Monad.Trans
 import Control.Monad.State.Class
 import qualified Network.Socket as N
 import Network.Socket.ByteString
-import Data.ByteString.Char8 as S
+import qualified Data.ByteString.Char8 as S
 import Data.Word
 import Data.Int
 import Data.String
@@ -46,7 +46,7 @@ getHostAddress host port = do
 -- | connect attempts to connect to the supplied hostname and port.
 connect :: String -> String -> IO (Either GearmanError Connection)
 connect host port = do
-    sock <- N.socket N.AF_INET N.Datagram N.defaultProtocol
+    sock <- N.socket N.AF_INET N.Stream 6 -- Create new ipv4 TCP socket.
     ai <- getHostAddress host port
     case ai of 
         Nothing -> return $ Left $ gearmanError 1 (fromString ("could not resolve address" ++ host))
@@ -59,7 +59,7 @@ connect host port = do
 echo :: Connection -> IO (Maybe GearmanError)
 echo Connection{..} = do
     sent <- send sock $ lazyToChar8 req
-    let expected = fromIntegral (length $ lazyToChar8 $ req)  
+    let expected = fromIntegral (S.length $ lazyToChar8 $ req)  
     case () of _
                  | (sent == expected) -> do
                    rep <- recv sock 8
