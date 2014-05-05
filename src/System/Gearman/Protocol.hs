@@ -26,7 +26,6 @@ module System.Gearman.Protocol
     workFailClient,
     workFailWorker,
     getStatus,
-    echoReq,
     echoRes,
     submitJobBg,
     error,
@@ -49,11 +48,13 @@ module System.Gearman.Protocol
     submitJobLow,
     submitJobLowBg,
     submitJobSched,
-    submitJobEpoch
+    submitJobEpoch,
+    packData,
+    buildEchoReq
 ) where
 
 import Prelude hiding (error)
-import Data.ByteString.Lazy as S
+import qualified Data.ByteString.Lazy as S
 import Data.Binary.Put
 import Control.Monad
 
@@ -244,3 +245,10 @@ submitJobSched      = PacketHeader SubmitJobSched Req Client
 submitJobEpoch      :: PacketHeader
 submitJobEpoch      = PacketHeader SubmitJobEpoch Req Client
 
+-- | packData takes a list of message parts (ByteStrings) and concatenates 
+--   them with null bytes in between.
+packData            :: [S.ByteString] -> S.ByteString
+packData            = S.append "\0" . (S.intercalate "\0")
+
+buildEchoReq        :: [S.ByteString] -> S.ByteString
+buildEchoReq        = (S.append (renderHeader echoReq)) . packData

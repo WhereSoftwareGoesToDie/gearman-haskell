@@ -15,6 +15,7 @@ import Control.Monad.State.Class
 import qualified Network.Socket as N
 import Network.Socket.ByteString
 import qualified Data.ByteString.Char8 as S
+import qualified Data.ByteString.Lazy as L
 import Data.Word
 import Data.Int
 import Data.String
@@ -56,8 +57,8 @@ connect host port = do
 
 -- | echo tests a Connection by sending (and waiting for a response to) an
 --   echo packet. 
-echo :: Connection -> IO (Maybe GearmanError)
-echo Connection{..} = do
+echo :: Connection -> [L.ByteString] ->  IO (Maybe GearmanError)
+echo Connection{..} payload = do
     sent <- send sock $ lazyToChar8 req
     let expected = fromIntegral (S.length $ lazyToChar8 $ req)  
     case () of _
@@ -68,6 +69,6 @@ echo Connection{..} = do
                        x -> return $ Just $ recvError x
                  | otherwise          -> return $ Just $ sendError sent
   where
-    req = renderHeader echoReq
+    req = buildEchoReq payload
     sendError b = gearmanError 2 ("echo failed: only sent " ++ (show b) ++ " bytes")
     recvError b = gearmanError 3 ("echo failed: only received " ++ (show b) ++ " bytes")

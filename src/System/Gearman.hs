@@ -14,4 +14,4 @@ testConnectEcho h p = do
     c <- connect h p
     case c of 
         Left x  -> return $ Just x
-        Right x -> echo x
+        Right x -> echo x ["ping"]
