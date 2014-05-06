@@ -22,6 +22,10 @@ data Job = Job {
     uniqId       :: S.ByteString
 }
 
+data JobError = JobError {
+    error :: !S.ByteString
+}
+
 data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
 
 addFunc :: S.ByteString -> WorkerFunc -> Int -> IO (Maybe GearmanError)
