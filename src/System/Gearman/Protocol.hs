@@ -256,3 +256,6 @@ packData d          = runPut $ do
 
 buildEchoReq        :: [S.ByteString] -> S.ByteString
 buildEchoReq        = (S.append (renderHeader echoReq)) . packData
+
+buildCanDo          :: S.ByteString -> S.ByteString
+buildCanDo fn       = S.append (S.append (renderHeader canDo) fn) "\0"

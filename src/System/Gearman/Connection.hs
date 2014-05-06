@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module System.Gearman.Connection(
     Connection,
@@ -11,6 +12,8 @@ import Prelude hiding (length)
 import Control.Monad
 import Control.Applicative
 import Control.Monad.Trans
+import Control.Monad.Reader
+import Control.Monad.State
 import Control.Monad.State.Class
 import qualified Network.Socket as N
 import Network.Socket.ByteString
@@ -30,6 +33,11 @@ import System.Gearman.Util
 data Connection = Connection {
     sock :: N.Socket
 }
+
+type Gearman = State Connection
+
+newtype GearmanT a = GearmanT (ReaderT Connection IO a)
+    deriving (Functor, Applicative, Monad, MonadIO, MonadReader Connection)
 
 getHostAddress :: String -> String -> IO (Maybe N.AddrInfo)
 getHostAddress host port = do
