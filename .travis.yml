@@ -1,4 +1,9 @@
 language: haskell
+
+env:
+  - 'UBUNTU_RELEASE=saucy'
+  - 'UBUNTU_RELEASE=trusty'
+
 before_install:
   - 'sudo apt-get install cabal-install ghc happy'
   - 'sudo apt-get install gearman-server'
