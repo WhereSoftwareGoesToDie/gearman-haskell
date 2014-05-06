@@ -7,6 +7,7 @@ module System.Gearman.Connection(
     connect,
     echo,
     runGearman,
+    Gearman,
     sendPacket
 ) where
 

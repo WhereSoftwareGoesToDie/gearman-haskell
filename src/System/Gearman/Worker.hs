@@ -3,12 +3,14 @@
 module System.Gearman.Worker
 (
     Job,
-    WorkerFunc
+    WorkerFunc,
+    addFunc
 ) where
 
 import qualified Data.ByteString.Lazy as S
 import Data.Either
 import Control.Monad
+import Control.Monad.Reader
 
 import System.Gearman.Error
 import System.Gearman.Connection
@@ -30,9 +32,10 @@ data JobError = JobError {
 
 data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
 
-addFunc :: Connection -> S.ByteString -> WorkerFunc -> Maybe Int -> IO (Maybe GearmanError)
-addFunc Connection{..} fnId f timeout = do
+addFunc :: S.ByteString -> WorkerFunc -> Maybe Int -> Gearman (Maybe GearmanError)
+addFunc fnId f timeout = do
+    Connection{..} <- ask
     packet <- case timeout of 
-        Nothing -> buildCanDoReq fnId
-        Just t  -> buildCanDoTimeoutReq fnId t
+        Nothing -> return $ buildCanDoReq fnId
+        Just t  -> return $ buildCanDoTimeoutReq fnId t
     sendPacket packet
