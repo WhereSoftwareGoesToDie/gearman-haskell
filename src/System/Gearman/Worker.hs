@@ -33,6 +33,6 @@ data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
 addFunc :: Connection -> S.ByteString -> WorkerFunc -> Maybe Int -> IO (Maybe GearmanError)
 addFunc Connection{..} fnId f timeout = do
     packet <- case timeout of 
-        Nothing -> buildCanDo fnId
-        Just t  -> buildCanDoTimeout fnId t
-    
+        Nothing -> buildCanDoReq fnId
+        Just t  -> buildCanDoTimeoutReq fnId t
+    sendPacket packet

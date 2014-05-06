@@ -6,7 +6,8 @@ module System.Gearman.Connection(
     Connection(..),
     connect,
     echo,
-    runGearman
+    runGearman,
+    sendPacket
 ) where
 
 import Prelude hiding (length)
@@ -93,3 +94,14 @@ runGearman host port (Gearman action) = do
             r <- runReaderT action x
             liftIO $ cleanup x
             return r
+
+sendPacket :: L.ByteString -> Gearman (Maybe GearmanError)
+sendPacket packet = do
+    Connection{..} <- ask
+    let expected = fromIntegral (S.length $ lazyToChar8 packet)
+    sent <- liftIO $ send sock $ lazyToChar8 packet
+    case () of _
+                 | (sent == expected) -> return Nothing
+                 | otherwise          -> return $ Just $ sendError sent
+  where 
+    sendError b = gearmanError 2 ("send failed: only sent " ++ (show b) ++ " bytes")
