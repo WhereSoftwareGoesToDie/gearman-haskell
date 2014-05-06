@@ -13,12 +13,15 @@ import Data.Int
 
 data ErrorCode = ErrorCode Int32 deriving (Show)
 
-data ErrorMessage = ErrorMessage S.ByteString
+data ErrorMessage = ErrorMessage S.ByteString deriving (Show)
 
 data GearmanError = GearmanError {
     code :: !ErrorCode,
     message :: !ErrorMessage
 }
+
+instance Show GearmanError where
+    show e = show (message e)
 
 data WorkerError = WorkerError {
     error :: !ErrorMessage,

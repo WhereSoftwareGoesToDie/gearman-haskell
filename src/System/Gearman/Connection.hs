@@ -5,10 +5,12 @@
 module System.Gearman.Connection(
     Connection,
     connect,
-    echo
+    echo,
+    runGearman
 ) where
 
 import Prelude hiding (length)
+import Control.Exception
 import Control.Monad
 import Control.Applicative
 import Control.Monad.Trans
@@ -27,16 +29,14 @@ import Foreign.C.Types
 import GHC.IO.Handle
 
 import System.Gearman.Error
-import System.Gearman.Protocol
+import System.Gearman.Protocol hiding (error)
 import System.Gearman.Util
 
 data Connection = Connection {
     sock :: N.Socket
 }
 
-type Gearman = State Connection
-
-newtype GearmanT a = GearmanT (ReaderT Connection IO a)
+newtype Gearman a = Gearman (ReaderT Connection IO a)
     deriving (Functor, Applicative, Monad, MonadIO, MonadReader Connection)
 
 getHostAddress :: String -> String -> IO (Maybe N.AddrInfo)
@@ -80,3 +80,16 @@ echo Connection{..} payload = do
     req = buildEchoReq payload
     sendError b = gearmanError 2 ("echo failed: only sent " ++ (show b) ++ " bytes")
     recvError b = gearmanError 3 ("echo failed: only received " ++ (show b) ++ " bytes")
+
+cleanup :: Connection -> IO ()
+cleanup Connection{..} = N.sClose sock
+
+runGearman :: String -> String -> Gearman a -> IO a
+runGearman host port (Gearman action) = do
+    c <- connect host port
+    case c of 
+        Left x  -> (error (show x))
+        Right x -> do
+            r <- runReaderT action x
+            liftIO $ cleanup x
+            return r
