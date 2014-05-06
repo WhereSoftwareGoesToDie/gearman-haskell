@@ -50,7 +50,9 @@ module System.Gearman.Protocol
     submitJobSched,
     submitJobEpoch,
     packData,
-    buildEchoReq
+    buildEchoReq,
+    buildCanDoReq,
+    buildCanDoTimeoutReq
 ) where
 
 import Prelude hiding (error)
@@ -245,6 +247,11 @@ submitJobSched      = PacketHeader SubmitJobSched Req Client
 submitJobEpoch      :: PacketHeader
 submitJobEpoch      = PacketHeader SubmitJobEpoch Req Client
 
+-- | marshalWord32 returns the ByteString representation of 
+--   the supplied Int as a big-endian Word32. 
+marshalWord32       :: Int -> S.ByteString
+marshalWord32 n     = runPut $ putWord32be $ fromIntegral n
+
 -- | packData takes a list of message parts (ByteStrings) and concatenates 
 --   them with null bytes in between and the length in front.
 packData            :: [S.ByteString] -> S.ByteString
@@ -257,5 +264,11 @@ packData d          = runPut $ do
 buildEchoReq        :: [S.ByteString] -> S.ByteString
 buildEchoReq        = (S.append (renderHeader echoReq)) . packData
 
-buildCanDo          :: S.ByteString -> S.ByteString
-buildCanDo fn       = S.append (S.append (renderHeader canDo) fn) "\0"
+buildCanDoReq          :: S.ByteString -> S.ByteString
+buildCanDoReq fn       = S.append (S.append (renderHeader canDo) fn) "\0"
+
+buildCanDoTimeoutReq :: 
+    S.ByteString -> 
+    Int -> 
+    S.ByteString
+buildCanDoTimeoutReq fn t = S.append (renderHeader canDoTimeout) (packData [fn, (marshalWord32 t)])

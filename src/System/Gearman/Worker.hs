@@ -11,6 +11,8 @@ import Data.Either
 import Control.Monad
 
 import System.Gearman.Error
+import System.Gearman.Connection
+import System.Gearman.Protocol
 
 data Job = Job {
     jobData      :: [S.ByteString],
@@ -28,5 +30,9 @@ data JobError = JobError {
 
 data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
 
-addFunc :: S.ByteString -> WorkerFunc -> Int -> IO (Maybe GearmanError)
-addFunc fnId f timeout = undefined
+addFunc :: Connection -> S.ByteString -> WorkerFunc -> Maybe Int -> IO (Maybe GearmanError)
+addFunc Connection{..} fnId f timeout = do
+    packet <- case timeout of 
+        Nothing -> buildCanDo fnId
+        Just t  -> buildCanDoTimeout fnId t
+    

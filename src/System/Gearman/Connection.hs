@@ -3,7 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module System.Gearman.Connection(
-    Connection,
+    Connection(..),
     connect,
     echo,
     runGearman
