@@ -1,16 +1,28 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module System.Gearman.Worker
 (
-    Job
+    Job,
+    WorkerFunc
 ) where
 
-import Data.ByteString.Lazy
+import qualified Data.ByteString.Lazy as S
+import Data.Either
+import Control.Monad
+
+import System.Gearman.Error
 
 data Job = Job {
-    jobData      :: [ByteString],
-    fn           :: ByteString,
-    sendWarning  :: (ByteString -> ()),
-    sendData     :: (ByteString -> ()),
+    jobData      :: [S.ByteString],
+    fn           :: S.ByteString,
+    sendWarning  :: (S.ByteString -> ()),
+    sendData     :: (S.ByteString -> ()),
     updateStatus :: (Int -> Int -> ()),
-    handle       :: ByteString,
-    uniqId       :: ByteString
+    handle       :: S.ByteString,
+    uniqId       :: S.ByteString
 }
+
+data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
+
+addFunc :: S.ByteString -> WorkerFunc -> Int -> IO (Maybe GearmanError)
+addFunc fnId f timeout = undefined
