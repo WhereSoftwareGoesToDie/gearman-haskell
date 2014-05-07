@@ -3,9 +3,10 @@
 module System.Gearman.Worker
 (
     Job,
-    WorkerFunc(..),
+    WorkerFunc,
     JobError,
-    addFunc
+    addFunc,
+    workerFunc
 ) where
 
 import qualified Data.ByteString.Lazy as S
@@ -32,6 +33,9 @@ data JobError = JobError {
 }
 
 data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
+
+workerFunc :: (Job -> IO (Either JobError S.ByteString)) -> WorkerFunc
+workerFunc f = WorkerFunc f
 
 addFunc :: S.ByteString -> WorkerFunc -> Maybe Int -> Gearman (Maybe GearmanError)
 addFunc fnId f timeout = do
