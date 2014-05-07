@@ -13,6 +13,7 @@ import qualified Data.ByteString.Lazy as S
 import Data.Either
 import Control.Monad
 import Control.Monad.Reader
+import Control.Monad.Trans.State
 
 import System.Gearman.Error
 import System.Gearman.Connection
@@ -33,6 +34,12 @@ data JobError = JobError {
 }
 
 data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
+
+data Work = Work {
+    map :: WorkMap
+}
+
+newtype Worker a = Worker (StateT Work Gearman a)
 
 workerFunc :: (Job -> IO (Either JobError S.ByteString)) -> WorkerFunc
 workerFunc f = WorkerFunc f
