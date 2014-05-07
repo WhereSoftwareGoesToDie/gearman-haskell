@@ -4,6 +4,7 @@ module System.Gearman.Worker
 (
     Job,
     WorkerFunc,
+    JobError,
     addFunc
 ) where
 

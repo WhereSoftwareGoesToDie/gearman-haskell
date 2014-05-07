@@ -22,10 +22,10 @@ testConnectivity = do
     assertBool "connect failed" (isNothing c)
     return ()
 
-testRegister = do
-    r <- runGearman "localhost" "4370" $ return $ addFunc "reverse" rvs Nothing
-    assertBool "send failed" (isNothing r)
-    return ()
+--testRegister = do
+--    r <- runGearman "localhost" "4370" $ return $ addFunc "reverse" rvs Nothing
+--    assertBool "send failed" (isNothing r)
+--    return ()
 
 suite :: Spec
 suite = do
