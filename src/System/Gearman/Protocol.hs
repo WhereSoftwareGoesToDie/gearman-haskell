@@ -264,8 +264,8 @@ packData d          = runPut $ do
 buildEchoReq        :: [S.ByteString] -> S.ByteString
 buildEchoReq        = (S.append (renderHeader echoReq)) . packData
 
-buildCanDoReq          :: S.ByteString -> S.ByteString
-buildCanDoReq fn       = S.append (S.append (renderHeader canDo) fn) "\0"
+buildCanDoReq       :: S.ByteString -> S.ByteString
+buildCanDoReq       = S.append (renderHeader canDo)
 
 buildCanDoTimeoutReq :: 
     S.ByteString -> 

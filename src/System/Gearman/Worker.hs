@@ -35,6 +35,8 @@ data JobError = JobError {
 
 data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
 
+data WorkMap = Map S.ByteString WorkerFunc
+
 data Work = Work {
     map :: WorkMap
 }
