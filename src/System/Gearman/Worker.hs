@@ -12,8 +12,12 @@ module System.Gearman.Worker
 import qualified Data.ByteString.Lazy as S
 import Data.Either
 import Control.Monad
-import Control.Monad.Reader
-import Control.Monad.Trans.State
+import qualified Control.Monad.Reader as MR
+import qualified Control.Monad.Trans.State as STM
+import Control.Monad.State.Class
+import Control.Monad.State.Strict
+import qualified Data.Map as M
+import Data.Map (Map)
 
 import System.Gearman.Error
 import System.Gearman.Connection
@@ -35,20 +39,28 @@ data JobError = JobError {
 
 data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
 
-data WorkMap = Map S.ByteString WorkerFunc
+data WorkMap = WorkMap (Map S.ByteString WorkerFunc)
 
 data Work = Work {
-    map :: WorkMap
+    map :: WorkMap,
+    conn :: Connection,
+    nWorkers :: Int
 }
 
 newtype Worker a = Worker (StateT Work Gearman a)
+
+runWorker :: Int -> Worker a -> Gearman a
+runWorker nWorkers (Worker action) = do
+    c <- MR.ask
+    r <- runStateT action $ Work (WorkMap M.empty) c nWorkers
+    return $ fst r
 
 workerFunc :: (Job -> IO (Either JobError S.ByteString)) -> WorkerFunc
 workerFunc f = WorkerFunc f
 
 addFunc :: S.ByteString -> WorkerFunc -> Maybe Int -> Gearman (Maybe GearmanError)
 addFunc fnId f timeout = do
-    Connection{..} <- ask
+    Connection{..} <- MR.ask
     packet <- case timeout of 
         Nothing -> return $ buildCanDoReq fnId
         Just t  -> return $ buildCanDoTimeoutReq fnId t
