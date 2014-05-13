@@ -29,6 +29,7 @@ import Data.String
 import Data.Either
 import Foreign.C.Types
 import GHC.IO.Handle
+import Numeric (showHex)
 
 import System.Gearman.Error
 import System.Gearman.Protocol hiding (error)
@@ -101,8 +102,10 @@ sendPacket packet = do
     Connection{..} <- ask
     let expected = fromIntegral (S.length $ lazyToChar8 packet)
     sent <- liftIO $ send sock $ lazyToChar8 packet
+    prettyPrint packet
     case () of _
                  | (sent == expected) -> return Nothing
                  | otherwise          -> return $ Just $ sendError sent
   where 
     sendError b = gearmanError 2 ("send failed: only sent " ++ (show b) ++ " bytes")
+    prettyPrint = liftIO . putStrLn . show . L.unpack

@@ -265,7 +265,7 @@ buildEchoReq        :: [S.ByteString] -> S.ByteString
 buildEchoReq        = (S.append (renderHeader echoReq)) . packData
 
 buildCanDoReq       :: S.ByteString -> S.ByteString
-buildCanDoReq       = S.append (renderHeader canDo)
+buildCanDoReq       = (S.append (renderHeader canDo)) . packData . (:[])
 
 buildCanDoTimeoutReq :: 
     S.ByteString -> 
