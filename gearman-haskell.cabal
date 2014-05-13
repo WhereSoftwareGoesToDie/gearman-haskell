@@ -22,6 +22,7 @@ library
                        System.Gearman.Protocol
                        System.Gearman.Connection
                        System.Gearman.Util
+                       System.Gearman.Worker
   build-depends:       base >=4.6,
                        data-endian,
                        bytestring,
