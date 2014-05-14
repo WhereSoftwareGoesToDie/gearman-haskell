@@ -30,6 +30,7 @@ import Data.Either
 import Foreign.C.Types
 import GHC.IO.Handle
 import Numeric (showHex)
+import Control.Concurrent.MVar
 
 import System.Gearman.Error
 import System.Gearman.Protocol hiding (error)
