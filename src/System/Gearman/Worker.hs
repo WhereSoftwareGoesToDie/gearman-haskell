@@ -75,12 +75,13 @@ data JobError = JobError {
 
 -- |Maintained by the controller, defines the mapping between 
 -- function identifiers read from the server and Haskell functions.
-type WorkMap = Map S.ByteString Capability
+type FuncMap = Map S.ByteString Capability
 
 -- |Internal state for the Worker monad.
 data Work = Work {
-    workMap :: WorkMap,
-    nWorkers :: Int
+    funcMap :: FuncMap,
+    nWorkers :: Int,
+    workerChans :: [Chan WorkerMessage]
 }
 
 -- |This monad maintains a worker's state, and must be run within
@@ -93,7 +94,7 @@ liftGearman = Worker . lift
 
 runWorker :: Int -> Worker a -> Gearman a
 runWorker nWorkers (Worker action) = 
-    evalStateT action $ Work M.empty nWorkers
+    evalStateT action $ Work M.empty nWorkers []
 
 -- |addFunc registers a function with the server as performable by a 
 -- worker.
@@ -108,7 +109,7 @@ addFunc name f tout = do
     let packet = case timeout of
                     Nothing -> buildCanDoReq ident
                     Just t  -> buildCanDoTimeoutReq ident t
-    put $ Work (M.insert ident cap workMap) nWorkers
+    put $ Work (M.insert ident cap funcMap) nWorkers workerChans
     liftGearman $ sendPacket packet
 
 -- |The controller handles communication with the server, dispatching of 
@@ -116,10 +117,12 @@ addFunc name f tout = do
 controller :: Worker (Maybe GearmanError)
 controller = do
     Work{..} <- get
-    case (M.null workMap) of
+    case (M.null funcMap) of
         True -> return Nothing -- nothing to do, so exit without error
         False -> undefined
 
+-- |Run a worker. This blocks forever, and therefore should be run in a 
+-- separate thread.
 doWork :: Chan JobSpec -> IO ()
 doWork jobChan = forever $ do
     JobSpec{..} <- readChan jobChan
