@@ -7,7 +7,9 @@ module System.Gearman.Worker
     WorkerFunc,
     JobError,
     addFunc,
-    newCapability
+    Worker,
+    runWorker,
+    work
 ) where
 
 import qualified Data.ByteString.Lazy as S
@@ -115,18 +117,18 @@ addFunc name f tout = do
     put $ Work (M.insert ident cap funcMap) nWorkers workerMsgChan workerJobChan
     liftGearman $ sendPacket packet
 
--- |The controller handles communication with the server, dispatching of 
+-- |startWork handles communication with the server, dispatching of 
 -- worker threads and reporting of results.
-controller :: Worker (Maybe GearmanError)
-controller = do
+work :: Worker (Maybe GearmanError)
+work = do
     Work{..} <- get
-    liftIO $ replicateM_ nWorkers (async (doWork workerJobChan) >>= link)
+    liftIO $ replicateM_ nWorkers (async (worker workerJobChan) >>= link)
     return Nothing
 
 -- |Run a worker. This blocks forever, and therefore should be run in a 
 -- separate thread.
-doWork :: TChan JobSpec -> IO ()
-doWork jobChan = forever $ do
+worker :: TChan JobSpec -> IO ()
+worker jobChan = forever $ do
     JobSpec{..} <- (atomically . readTChan) jobChan
     undefined
     
