@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module System.Gearman.Worker
 (
@@ -12,9 +13,7 @@ module System.Gearman.Worker
 import qualified Data.ByteString.Lazy as S
 import Data.Either
 import Control.Monad
-import qualified Control.Monad.Reader as MR
-import qualified Control.Monad.Trans.State as STM
-import Control.Monad.State.Class
+import Control.Applicative
 import Control.Monad.State.Strict
 import qualified Data.Map as M
 import Data.Map (Map)
@@ -39,29 +38,31 @@ data JobError = JobError {
 
 data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
 
-data WorkMap = WorkMap (Map S.ByteString WorkerFunc)
+type WorkMap = Map S.ByteString WorkerFunc
 
 data Work = Work {
-    map :: WorkMap,
-    conn :: Connection,
+    workMap :: WorkMap,
     nWorkers :: Int
 }
 
 newtype Worker a = Worker (StateT Work Gearman a)
+    deriving (Functor, Applicative, Monad, MonadIO, MonadState Work)
+
+liftGearman :: Gearman a -> Worker a
+liftGearman = Worker . lift
 
 runWorker :: Int -> Worker a -> Gearman a
-runWorker nWorkers (Worker action) = do
-    c <- MR.ask
-    r <- runStateT action $ Work (WorkMap M.empty) c nWorkers
-    return $ fst r
+runWorker nWorkers (Worker action) = 
+    evalStateT action $ Work M.empty nWorkers
 
 workerFunc :: (Job -> IO (Either JobError S.ByteString)) -> WorkerFunc
-workerFunc f = WorkerFunc f
+workerFunc = WorkerFunc
 
-addFunc :: S.ByteString -> WorkerFunc -> Maybe Int -> Gearman (Maybe GearmanError)
+addFunc :: S.ByteString -> WorkerFunc -> Maybe Int -> Worker (Maybe GearmanError)
 addFunc fnId f timeout = do
-    Connection{..} <- MR.ask
-    packet <- case timeout of 
-        Nothing -> return $ buildCanDoReq fnId
-        Just t  -> return $ buildCanDoTimeoutReq fnId t
-    sendPacket packet
+    Work{..} <- get
+    let packet = case timeout of
+                    Nothing -> buildCanDoReq fnId
+                    Just t  -> buildCanDoTimeoutReq fnId t
+    put $ Work (M.insert fnId f workMap) nWorkers
+    liftGearman $ sendPacket packet
