@@ -26,22 +26,9 @@ import System.Gearman.Error
 import System.Gearman.Connection
 import System.Gearman.Protocol
 
-data Job = Job {
-    jobData      :: [S.ByteString],
-    fn           :: S.ByteString,
-    sendWarning  :: (S.ByteString -> ()),
-    sendData     :: (S.ByteString -> ()),
-    updateStatus :: (Int -> Int -> ()),
-    handle       :: S.ByteString,
-    uniqId       :: S.ByteString
-}
-
-data JobError = JobError {
-    error :: !S.ByteString
-}
-
 data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
 
+-- |A Capability is something a worker can do.
 data Capability = Capability {
     ident :: S.ByteString,
     func :: WorkerFunc,
@@ -49,6 +36,7 @@ data Capability = Capability {
     outgoing :: TBChan Job
 }
 
+-- |Initialize a new Capability from initial job data.
 newCapability :: S.ByteString -> 
               (Job -> IO (Either JobError S.ByteString)) -> 
               Maybe Int ->
@@ -57,13 +45,28 @@ newCapability ident f timeout = do
     outChan <- liftIO $ atomically $ newTBChan 1
     return $ Capability ident (WorkerFunc f) timeout outChan
 
+-- |The data passed to a worker when running a job.
+data Job = Job {
+    jobData      :: [S.ByteString],
+    capability   :: Capability
+}
+
+data JobError = JobError {
+    error :: !S.ByteString
+}
+
+-- |Maintained by the controller, defines the mapping between 
+-- function identifiers read from the server and Haskell functions.
 type WorkMap = Map S.ByteString Capability
 
+-- |Internal state for the Worker monad.
 data Work = Work {
     workMap :: WorkMap,
     nWorkers :: Int
 }
 
+-- |This monad maintains a worker's state, and must be run within
+-- the Gearman monad.
 newtype Worker a = Worker (StateT Work Gearman a)
     deriving (Functor, Applicative, Monad, MonadIO, MonadState Work)
 
@@ -74,10 +77,12 @@ runWorker :: Int -> Worker a -> Gearman a
 runWorker nWorkers (Worker action) = 
     evalStateT action $ Work M.empty nWorkers
 
+-- |addFunc registers a function with the server as performable by a 
+-- worker.
 addFunc :: S.ByteString ->
            (Job -> IO (Either JobError S.ByteString)) -> 
            Maybe Int ->
-           Worker (Either GearmanError Capability)
+           Worker (Maybe GearmanError)
 addFunc name f tout = do
     Work{..} <- get
     cap <- newCapability name f tout
@@ -86,11 +91,10 @@ addFunc name f tout = do
                     Nothing -> buildCanDoReq ident
                     Just t  -> buildCanDoTimeoutReq ident t
     put $ Work (M.insert ident cap workMap) nWorkers
-    res <- liftGearman $ sendPacket packet
-    case res of
-        Nothing -> return $ Right cap
-        Just e  -> return $ Left e
+    liftGearman $ sendPacket packet
 
+-- |The controller handles communication with the server, dispatching of 
+-- worker threads and reporting of results.
 controller :: Worker (Maybe GearmanError)
 controller = do
     Work{..} <- get
@@ -98,3 +102,4 @@ controller = do
         True -> return Nothing -- nothing to do, so exit without error
         False -> undefined
 
+startWorker job
