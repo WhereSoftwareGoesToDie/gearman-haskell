@@ -81,7 +81,7 @@ type FuncMap = Map S.ByteString Capability
 data Work = Work {
     funcMap :: FuncMap,
     nWorkers :: Int,
-    workerChans :: [Chan WorkerMessage]
+    workerChan :: TChan WorkerMessage
 }
 
 -- |This monad maintains a worker's state, and must be run within
@@ -93,8 +93,9 @@ liftGearman :: Gearman a -> Worker a
 liftGearman = Worker . lift
 
 runWorker :: Int -> Worker a -> Gearman a
-runWorker nWorkers (Worker action) = 
-    evalStateT action $ Work M.empty nWorkers []
+runWorker nWorkers (Worker action) = do
+    chan <- (liftIO . atomically) newTChan
+    evalStateT action $ Work M.empty nWorkers chan
 
 -- |addFunc registers a function with the server as performable by a 
 -- worker.
@@ -109,7 +110,7 @@ addFunc name f tout = do
     let packet = case timeout of
                     Nothing -> buildCanDoReq ident
                     Just t  -> buildCanDoTimeoutReq ident t
-    put $ Work (M.insert ident cap funcMap) nWorkers workerChans
+    put $ Work (M.insert ident cap funcMap) nWorkers workerChan
     liftGearman $ sendPacket packet
 
 -- |The controller handles communication with the server, dispatching of 
@@ -117,8 +118,6 @@ addFunc name f tout = do
 controller :: Worker (Maybe GearmanError)
 controller = do
     Work{..} <- get
-    chans <- liftIO $ replicateM nWorkers (newChan >>= return) 
-    put $ Work funcMap nWorkers chans
     return Nothing
 
 -- |Run a worker. This blocks forever, and therefore should be run in a 
