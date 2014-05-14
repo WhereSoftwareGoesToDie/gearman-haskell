@@ -11,8 +11,10 @@ before_install:
 
 install:
   - 'cabal update'
+  - 'cabal install --only-dependencies --enable-tests --enable-benchmarks'
 
 script:
-  - 'cabal install --enable-tests --enable-benchmarks'
+  - 'cabal configure'
+  - 'cabal build'
   - 'cabal test'
   - 'cabal sdist'
