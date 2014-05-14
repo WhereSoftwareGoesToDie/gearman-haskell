@@ -32,8 +32,7 @@ data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
 data Capability = Capability {
     ident :: S.ByteString,
     func :: WorkerFunc,
-    timeout :: Maybe Int,
-    outgoing :: TBChan Job
+    timeout :: Maybe Int
 }
 
 -- |Initialize a new Capability from initial job data.
@@ -42,14 +41,33 @@ newCapability :: S.ByteString ->
               Maybe Int ->
               Worker Capability
 newCapability ident f timeout = do
-    outChan <- liftIO $ atomically $ newTBChan 1
-    return $ Capability ident (WorkerFunc f) timeout outChan
+--    outChan <- liftIO $ atomically $ newTBChan 1
+    return $ Capability ident (WorkerFunc f) timeout 
 
--- |The data passed to a worker when running a job.
+type WorkerWarning = S.ByteString
+
+type WorkerData = S.ByteString
+
+type WorkerStatus = (Int, Int)
+
+data WorkerMessage = WorkerWarning | WorkerData | WorkerStatus
+
+-- |The data passed to a worker function when running a job.
 data Job = Job {
-    jobData      :: [S.ByteString],
-    capability   :: Capability
+    jobData :: [S.ByteString],
+    sendWarning :: (S.ByteString -> IO ()),
+    sendData    :: (S.ByteString -> IO ()),
+    sendStatus  :: (S.ByteString -> IO ())
 }
+
+-- |The data passed to a worker when a job is received.
+data JobSpec = JobSpec {
+    rawJobData :: S.ByteString,
+    jobName    :: S.ByteString,
+    jobFunc    :: WorkerFunc,
+    outChan    :: Chan WorkerMessage
+}
+    
 
 data JobError = JobError {
     error :: !S.ByteString
@@ -102,4 +120,8 @@ controller = do
         True -> return Nothing -- nothing to do, so exit without error
         False -> undefined
 
-startWorker job
+doWork :: Chan JobSpec -> IO ()
+doWork jobChan = forever $ do
+    JobSpec{..} <- readChan jobChan
+    undefined
+    
