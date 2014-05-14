@@ -7,7 +7,7 @@ module System.Gearman.Worker
     WorkerFunc,
     JobError,
     addFunc,
-    getCapability
+    newCapability
 ) where
 
 import qualified Data.ByteString.Lazy as S
@@ -19,6 +19,8 @@ import qualified Data.Map as M
 import Data.Map (Map,empty)
 import Control.Concurrent.Async
 import Control.Concurrent.Chan
+import Control.Concurrent.STM.TBChan
+import Control.Concurrent.STM
 
 import System.Gearman.Error
 import System.Gearman.Connection
@@ -43,14 +45,17 @@ data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
 data Capability = Capability {
     ident :: S.ByteString,
     func :: WorkerFunc,
-    timeout :: Maybe Int
+    timeout :: Maybe Int,
+    outgoing :: TBChan Job
 }
 
-getCapability :: S.ByteString -> 
+newCapability :: S.ByteString -> 
               (Job -> IO (Either JobError S.ByteString)) -> 
               Maybe Int ->
-              Capability 
-getCapability ident f timeout = Capability ident (WorkerFunc f) timeout
+              Worker Capability
+newCapability ident f timeout = do
+    outChan <- liftIO $ atomically $ newTBChan 1
+    return $ Capability ident (WorkerFunc f) timeout outChan
 
 type WorkMap = Map S.ByteString Capability
 
@@ -69,15 +74,22 @@ runWorker :: Int -> Worker a -> Gearman a
 runWorker nWorkers (Worker action) = 
     evalStateT action $ Work M.empty nWorkers
 
-addFunc :: Capability -> Worker (Maybe GearmanError)
-addFunc capability = do
+addFunc :: S.ByteString ->
+           (Job -> IO (Either JobError S.ByteString)) -> 
+           Maybe Int ->
+           Worker (Either GearmanError Capability)
+addFunc name f tout = do
     Work{..} <- get
-    let Capability{..} = capability
+    cap <- newCapability name f tout
+    let Capability{..} = cap
     let packet = case timeout of
                     Nothing -> buildCanDoReq ident
                     Just t  -> buildCanDoTimeoutReq ident t
-    put $ Work (M.insert ident capability workMap) nWorkers
-    liftGearman $ sendPacket packet
+    put $ Work (M.insert ident cap workMap) nWorkers
+    res <- liftGearman $ sendPacket packet
+    case res of
+        Nothing -> return $ Right cap
+        Just e  -> return $ Left e
 
 controller :: Worker (Maybe GearmanError)
 controller = do
@@ -86,14 +98,3 @@ controller = do
         True -> return Nothing -- nothing to do, so exit without error
         False -> undefined
 
-performJobs :: [Capability] -> Worker (Maybe GearmanError)
-performJobs capabilities = do
-    results <- mapM addFunc capabilities
-    let errors = filter (not . isNothing) results
-    case errors of 
-        [] -> controller
-        es  -> return $ head es
-  where
-    isNothing x = case x of
-        Nothing -> True
-        Just _  -> False
