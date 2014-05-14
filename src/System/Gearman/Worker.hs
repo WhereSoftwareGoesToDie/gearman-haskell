@@ -117,9 +117,9 @@ addFunc name f tout = do
 controller :: Worker (Maybe GearmanError)
 controller = do
     Work{..} <- get
-    case (M.null funcMap) of
-        True -> return Nothing -- nothing to do, so exit without error
-        False -> undefined
+    chans <- liftIO $ replicateM nWorkers (newChan >>= return) 
+    put $ Work funcMap nWorkers chans
+    return Nothing
 
 -- |Run a worker. This blocks forever, and therefore should be run in a 
 -- separate thread.
