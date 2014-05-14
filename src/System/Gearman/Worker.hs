@@ -81,7 +81,8 @@ type FuncMap = Map S.ByteString Capability
 data Work = Work {
     funcMap :: FuncMap,
     nWorkers :: Int,
-    workerChan :: TChan WorkerMessage
+    workerMsgChan :: TChan WorkerMessage,
+    workerJobChan :: TChan JobSpec
 }
 
 -- |This monad maintains a worker's state, and must be run within
@@ -94,8 +95,9 @@ liftGearman = Worker . lift
 
 runWorker :: Int -> Worker a -> Gearman a
 runWorker nWorkers (Worker action) = do
-    chan <- (liftIO . atomically) newTChan
-    evalStateT action $ Work M.empty nWorkers chan
+    outChan <- (liftIO . atomically) newTChan
+    inChan <- (liftIO . atomically) newTChan
+    evalStateT action $ Work M.empty nWorkers outChan inChan
 
 -- |addFunc registers a function with the server as performable by a 
 -- worker.
@@ -110,7 +112,7 @@ addFunc name f tout = do
     let packet = case timeout of
                     Nothing -> buildCanDoReq ident
                     Just t  -> buildCanDoTimeoutReq ident t
-    put $ Work (M.insert ident cap funcMap) nWorkers workerChan
+    put $ Work (M.insert ident cap funcMap) nWorkers workerMsgChan workerJobChan
     liftGearman $ sendPacket packet
 
 -- |The controller handles communication with the server, dispatching of 
@@ -118,12 +120,13 @@ addFunc name f tout = do
 controller :: Worker (Maybe GearmanError)
 controller = do
     Work{..} <- get
+    liftIO $ replicateM_ nWorkers (async (doWork workerJobChan) >>= link)
     return Nothing
 
 -- |Run a worker. This blocks forever, and therefore should be run in a 
 -- separate thread.
-doWork :: Chan JobSpec -> IO ()
+doWork :: TChan JobSpec -> IO ()
 doWork jobChan = forever $ do
-    JobSpec{..} <- readChan jobChan
+    JobSpec{..} <- (atomically . readTChan) jobChan
     undefined
     
