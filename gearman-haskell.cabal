@@ -42,6 +42,7 @@ library
 test-suite             check
     type:              exitcode-stdio-1.0
     build-depends:     base >= 4.6,
+                       bytestring,
                        gearman-haskell,
                        HUnit,
                        hspec,
