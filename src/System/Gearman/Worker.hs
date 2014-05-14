@@ -18,6 +18,7 @@ import Control.Monad.State.Strict
 import qualified Data.Map as M
 import Data.Map (Map,empty)
 import Control.Concurrent.Async
+import Control.Concurrent.Chan
 
 import System.Gearman.Error
 import System.Gearman.Connection
@@ -51,7 +52,7 @@ getCapability :: S.ByteString ->
               Capability 
 getCapability ident f timeout = Capability ident (WorkerFunc f) timeout
 
-type WorkMap = Map S.ByteString WorkerFunc
+type WorkMap = Map S.ByteString Capability
 
 data Work = Work {
     workMap :: WorkMap,
@@ -69,12 +70,13 @@ runWorker nWorkers (Worker action) =
     evalStateT action $ Work M.empty nWorkers
 
 addFunc :: Capability -> Worker (Maybe GearmanError)
-addFunc  Capability{..} = do
+addFunc capability = do
     Work{..} <- get
+    let Capability{..} = capability
     let packet = case timeout of
                     Nothing -> buildCanDoReq ident
                     Just t  -> buildCanDoTimeoutReq ident t
-    put $ Work (M.insert ident func workMap) nWorkers
+    put $ Work (M.insert ident capability workMap) nWorkers
     liftGearman $ sendPacket packet
 
 controller :: Worker (Maybe GearmanError)
