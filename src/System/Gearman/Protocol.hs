@@ -58,7 +58,8 @@ module System.Gearman.Protocol
     buildCanDoTimeoutReq,
     buildWorkCompleteReq,
     buildWorkDataReq,
-    buildWorkStatusReq
+    buildWorkStatusReq,
+    buildWorkWarningReq
 ) where
 
 import Prelude hiding (error)
