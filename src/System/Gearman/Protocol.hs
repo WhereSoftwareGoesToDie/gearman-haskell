@@ -319,6 +319,11 @@ buildWorkDataReq :: J.JobHandle -> J.JobData -> S.ByteString
 buildWorkDataReq handle payload =
     (S.append (renderHeader workDataWorker)) $ packData [handle, payload]
 
+-- |Construct a WORK_WARNING packet (same as above, but treated as a 
+-- warning). 
+buildWorkWarningReq :: J.JobHandle -> J.JobData -> S.ByteString
+buildWorkWarningReq handle payload =
+    (S.append (renderHeader workWarningWorker)) $ packData [handle, payload]
 
 -- |Construct a WORK_STATUS packet (send by workers to inform the server
 -- of the percentage of the job that has been completed). 
