@@ -278,3 +278,7 @@ buildCanDoTimeoutReq ::
     Int -> 
     S.ByteString
 buildCanDoTimeoutReq fn t = S.append (renderHeader canDoTimeout) (packData [fn, (marshalWord32 t)])
+
+buildWorkCompleteReq :: S.ByteString -> S.ByteString -> S.ByteString
+buildWorkCompleteReq handle response = 
+    (S.append (renderHeader workCompleteWorker)) $ packData[handle, response]
