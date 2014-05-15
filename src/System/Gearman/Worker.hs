@@ -12,17 +12,17 @@ module System.Gearman.Worker
     work
 ) where
 
-import qualified Data.ByteString.Lazy as S
-import Data.Either
-import Control.Monad
 import Control.Applicative
-import Control.Monad.State.Strict
-import qualified Data.Map as M
-import Data.Map (Map,empty)
 import Control.Concurrent.Async
 import Control.Concurrent.Chan
-import Control.Concurrent.STM.TBChan
 import Control.Concurrent.STM
+import Control.Concurrent.STM.TBChan
+import Control.Monad
+import Control.Monad.State.Strict
+import qualified Data.ByteString.Lazy as S
+import Data.Either
+import Data.Map (Map,empty)
+import qualified Data.Map as M
 
 import System.Gearman.Error
 import System.Gearman.Connection
