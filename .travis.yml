@@ -7,6 +7,7 @@ env:
 before_install:
   - 'sudo apt-get install cabal-install ghc happy'
   - 'sudo apt-get install gearman-server'
+  - 'sudo echo "ENABLED=\"true\"" >> /etc/default/gearman-server' 
   - 'sudo service gearman-server start'
 
 install:
