@@ -27,6 +27,7 @@ import qualified Data.Map as M
 import System.Gearman.Error
 import System.Gearman.Connection
 import System.Gearman.Protocol
+import System.Gearman.Job
 
 data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
 
@@ -46,14 +47,6 @@ newCapability ident f timeout = do
 --    outChan <- liftIO $ atomically $ newTBChan 1
     return $ Capability ident (WorkerFunc f) timeout 
 
-type WorkerWarning = S.ByteString
-
-type WorkerData = S.ByteString
-
-type WorkerStatus = (Int, Int)
-
-data WorkerMessage = WorkerWarning | WorkerData | WorkerStatus
-
 -- |The data passed to a worker function when running a job.
 data Job = Job {
     jobData :: [S.ByteString],
@@ -67,9 +60,9 @@ data JobSpec = JobSpec {
     rawJobData :: S.ByteString,
     jobName    :: S.ByteString,
     jobFunc    :: WorkerFunc,
-    outChan    :: Chan WorkerMessage
+    outChan    :: Chan JobMessage,
+    jobHandle  :: S.ByteString
 }
-    
 
 data JobError = JobError {
     error :: !S.ByteString
@@ -83,7 +76,7 @@ type FuncMap = Map S.ByteString Capability
 data Work = Work {
     funcMap :: FuncMap,
     nWorkers :: Int,
-    workerMsgChan :: TChan WorkerMessage,
+    workerMsgChan :: TChan JobMessage,
     workerJobChan :: TChan JobSpec
 }
 
@@ -122,13 +115,11 @@ addFunc name f tout = do
 work :: Worker (Maybe GearmanError)
 work = do
     Work{..} <- get
-    liftIO $ replicateM_ nWorkers (async (worker workerJobChan) >>= link)
     return Nothing
 
--- |Run a worker. This blocks forever, and therefore should be run in a 
--- separate thread.
-worker :: TChan JobSpec -> IO ()
-worker jobChan = forever $ do
-    JobSpec{..} <- (atomically . readTChan) jobChan
+-- |Run a worker with a job. 
+doWork :: JobSpec -> IO (Either JobError S.ByteString)
+doWork JobSpec{..} = do
+    let args = unpackData rawJobData
     undefined
-    
+    -- construct callbacks here

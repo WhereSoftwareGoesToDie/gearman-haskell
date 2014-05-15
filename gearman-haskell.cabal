@@ -21,8 +21,9 @@ library
                        System.Gearman.Error
                        System.Gearman.Protocol
                        System.Gearman.Connection
-                       System.Gearman.Util
                        System.Gearman.Worker
+  other-modules:       System.Gearman.Job
+                       System.Gearman.Util
   build-depends:       base >=4.6,
                        data-endian,
                        bytestring,

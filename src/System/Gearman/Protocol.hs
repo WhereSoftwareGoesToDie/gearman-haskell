@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
+-- Protocol documentation snippets from http://gearman.org/protocol/.
+
 module System.Gearman.Protocol
 (
     PacketMagic,
@@ -61,15 +63,24 @@ import qualified Data.ByteString.Lazy as S
 import Data.Binary.Put
 import Control.Monad
 
+import qualified System.Gearman.Job as J
+
+-- |Whether the packet is a request, response or an unused code.
+--
+-- >Communication happens between either a client and job server, or between a worker
+-- >and job server. In either case, the protocol consists of packets
+-- >containing requests and responses. All packets sent to a job server
+-- >are considered requests, and all packets sent from a job server are
+-- >considered responses.
+--
+-- (http://gearman.org/protocol/)
 data PacketMagic = Req | Res | Unused 
 
-renderMagic :: PacketMagic -> S.ByteString
-renderMagic Req = "\0REQ"
-renderMagic Res = "\0REP"
-renderMagic Unused = ""
-
+-- |Whether the packet type is sent/received by a client, a worker, 
+-- both, or is an unused code.
 data PacketDomain = Client | Worker | Both | None
 
+-- |Packet types, enumerated for 0-36 (and defined for {1-4,6-36}). 
 data PacketType =   NullByte
                   | CanDo
                   | CantDo
@@ -109,17 +120,13 @@ data PacketType =   NullByte
                   | SubmitJobEpoch
   deriving (Read,Show,Eq,Ord,Enum)
 
+-- |PacketHeader encapsulates all the information in a packet except 
+-- for the data (and data size prefix). 
 data PacketHeader = PacketHeader {
     packetType :: PacketType,
     magic      :: PacketMagic,
     domain     :: PacketDomain
 }
-
-renderHeader :: PacketHeader -> S.ByteString
-renderHeader PacketHeader{..} =
-    runPut $ do 
-        putLazyByteString (renderMagic magic) 
-        (putWord32be . fromIntegral . fromEnum) packetType
 
 canDo               :: PacketHeader
 canDo               = PacketHeader CanDo Req Worker
@@ -253,6 +260,19 @@ submitJobEpoch      = PacketHeader SubmitJobEpoch Req Client
 marshalWord32       :: Int -> S.ByteString
 marshalWord32 n     = runPut $ putWord32be $ fromIntegral n
 
+-- |Encode the 'magic' part of the packet header.
+renderMagic :: PacketMagic -> S.ByteString
+renderMagic Req = "\0REQ"
+renderMagic Res = "\0REP"
+renderMagic Unused = ""
+
+-- |Return the ByteString representation of a PacketHeader.
+renderHeader :: PacketHeader -> S.ByteString
+renderHeader PacketHeader{..} =
+    runPut $ do 
+        putLazyByteString (renderMagic magic) 
+        (putWord32be . fromIntegral . fromEnum) packetType
+
 -- | packData takes a list of message parts (ByteStrings) and concatenates 
 --   them with null bytes in between and the length in front.
 packData            :: [S.ByteString] -> S.ByteString
@@ -267,18 +287,29 @@ packData d          = runPut $ do
 unpackData          :: S.ByteString -> [S.ByteString]
 unpackData          = (S.split . fromIntegral . fromEnum) '\0'
 
+-- |Construct an ECHO_REQ packet.
 buildEchoReq        :: [S.ByteString] -> S.ByteString
 buildEchoReq        = (S.append (renderHeader echoReq)) . packData
 
+-- |Construct a CAN_DO request packet (workers send these to register 
+-- functions with the server). 
 buildCanDoReq       :: S.ByteString -> S.ByteString
 buildCanDoReq       = (S.append (renderHeader canDo)) . packData . (:[])
 
+-- |Construct a CAN_DO_TIMEOUT packet (as above, but with a timeout value).
+-- FIXME: confirm timestamp format.
 buildCanDoTimeoutReq :: 
     S.ByteString -> 
     Int -> 
     S.ByteString
 buildCanDoTimeoutReq fn t = S.append (renderHeader canDoTimeout) (packData [fn, (marshalWord32 t)])
 
-buildWorkCompleteReq :: S.ByteString -> S.ByteString -> S.ByteString
+-- |Construct a WORK_COMPLETE packet (sent by workers when they 
+-- finish a job). 
+buildWorkCompleteReq :: J.JobHandle -> J.JobData -> S.ByteString
 buildWorkCompleteReq handle response = 
     (S.append (renderHeader workCompleteWorker)) $ packData[handle, response]
+
+buildWorkDataReq :: J.JobHandle -> J.JobData -> S.ByteString
+buildWorkDataReq handle payload =
+    (S.append (renderHeader workDataWorker)) $ packData[handle, payload]
