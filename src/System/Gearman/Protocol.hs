@@ -55,7 +55,10 @@ module System.Gearman.Protocol
     unpackData,
     buildEchoReq,
     buildCanDoReq,
-    buildCanDoTimeoutReq
+    buildCanDoTimeoutReq,
+    buildWorkCompleteReq,
+    buildWorkDataReq,
+    buildWorkStatusReq
 ) where
 
 import Prelude hiding (error)
@@ -308,8 +311,20 @@ buildCanDoTimeoutReq fn t = S.append (renderHeader canDoTimeout) (packData [fn, 
 -- finish a job). 
 buildWorkCompleteReq :: J.JobHandle -> J.JobData -> S.ByteString
 buildWorkCompleteReq handle response = 
-    (S.append (renderHeader workCompleteWorker)) $ packData[handle, response]
+    (S.append (renderHeader workCompleteWorker)) $ packData [handle, response]
 
+-- |Construct a WORK_DATA packet (sent by workers when they have
+-- intermediate data to send for a job). 
 buildWorkDataReq :: J.JobHandle -> J.JobData -> S.ByteString
 buildWorkDataReq handle payload =
-    (S.append (renderHeader workDataWorker)) $ packData[handle, payload]
+    (S.append (renderHeader workDataWorker)) $ packData [handle, payload]
+
+
+-- |Construct a WORK_STATUS packet (send by workers to inform the server
+-- of the percentage of the job that has been completed). 
+buildWorkStatusReq :: J.JobHandle -> J.JobStatus -> S.ByteString
+buildWorkStatusReq handle status =
+    (S.append (renderHeader workStatusWorker)) $ packData args
+  where
+    args = handle : (map marshalWord32 $ toList status)
+    toList t = [fst t, snd t]
