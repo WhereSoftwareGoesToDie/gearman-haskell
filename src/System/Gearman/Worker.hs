@@ -29,7 +29,7 @@ import System.Gearman.Connection
 import System.Gearman.Protocol
 import System.Gearman.Job
 
-data WorkerFunc = WorkerFunc (Job -> IO (Either JobError S.ByteString))
+type WorkerFunc = (Job -> IO (Either JobError S.ByteString))
 
 -- |A Capability is something a worker can do.
 data Capability = Capability {
