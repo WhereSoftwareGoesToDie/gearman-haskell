@@ -45,14 +45,14 @@ newCapability :: S.ByteString ->
               Worker Capability
 newCapability ident f timeout = do
 --    outChan <- liftIO $ atomically $ newTBChan 1
-    return $ Capability ident (WorkerFunc f) timeout 
+    return $ Capability ident f timeout 
 
 -- |The data passed to a worker function when running a job.
 data Job = Job {
     jobData :: [S.ByteString],
     sendWarning :: (S.ByteString -> IO ()),
     sendData    :: (S.ByteString -> IO ()),
-    sendStatus  :: (S.ByteString -> IO ())
+    sendStatus  :: (JobStatus -> IO ())
 }
 
 -- |The data passed to a worker when a job is received.
@@ -60,7 +60,7 @@ data JobSpec = JobSpec {
     rawJobData :: S.ByteString,
     jobName    :: S.ByteString,
     jobFunc    :: WorkerFunc,
-    outChan    :: Chan JobMessage,
+    outChan    :: Chan S.ByteString,
     jobHandle  :: S.ByteString
 }
 
@@ -76,7 +76,7 @@ type FuncMap = Map S.ByteString Capability
 data Work = Work {
     funcMap :: FuncMap,
     nWorkers :: Int,
-    workerMsgChan :: TChan JobMessage,
+    workerMsgChan :: TChan S.ByteString,
     workerJobChan :: TChan JobSpec
 }
 
@@ -122,4 +122,12 @@ doWork :: JobSpec -> IO (Either JobError S.ByteString)
 doWork JobSpec{..} = do
     let args = unpackData rawJobData
     undefined
-    -- construct callbacks here
+    let job = Job (unpackData rawJobData)
+                  (dataCallback jobHandle outChan)
+                  (warningCallback jobHandle outChan)
+                  (statusCallback jobHandle outChan)
+    jobFunc job
+  where
+    dataCallback h c payload    = writeChan c $ buildWorkDataReq h payload
+    warningCallback h c payload = writeChan c $ buildWorkWarningReq h payload
+    statusCallback h c status   = writeChan c $ buildWorkStatusReq h status
