@@ -17,7 +17,9 @@ module System.Gearman.Protocol
     buildWorkCompleteReq,
     buildWorkDataReq,
     buildWorkStatusReq,
-    buildWorkWarningReq
+    buildWorkWarningReq,
+    buildWorkFailReq,
+    buildWorkExceptionReq
 ) where
 
 import Prelude hiding (error)
@@ -271,6 +273,16 @@ buildCanDoTimeoutReq fn t = S.append (renderHeader canDoTimeout) (packData [fn, 
 buildWorkCompleteReq :: J.JobHandle -> J.JobData -> S.ByteString
 buildWorkCompleteReq handle response = 
     (S.append (renderHeader workCompleteWorker)) $ packData [handle, response]
+
+-- |Construct a WORK_FAIL packet (sent by workers to report a job 
+-- failure with no accompanying data). 
+buildWorkFailReq :: J.JobHandle -> S.ByteString
+buildWorkFailReq = (S.append (renderHeader workFailWorker)) . packData . (:[])
+
+-- |Construct a WORK_EXCEPTION packet (sent by workers to report a job
+-- failure with accompanying exception data). 
+buildWorkExceptionReq :: J.JobHandle -> S.ByteString -> S.ByteString
+buildWorkExceptionReq handle msg = (S.append (renderHeader workFailWorker)) $ packData [handle, msg]
 
 -- |Construct a WORK_DATA packet (sent by workers when they have
 -- intermediate data to send for a job). 

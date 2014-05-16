@@ -64,9 +64,7 @@ data JobSpec = JobSpec {
     jobHandle  :: S.ByteString
 }
 
-data JobError = JobError {
-    error :: !S.ByteString
-}
+type JobError = Maybe S.ByteString
 
 -- |Maintained by the controller, defines the mapping between 
 -- function identifiers read from the server and Haskell functions.
@@ -118,16 +116,21 @@ work = do
     return Nothing
 
 -- |Run a worker with a job. 
-doWork :: JobSpec -> IO (Either JobError S.ByteString)
+doWork :: JobSpec -> IO ()
 doWork JobSpec{..} = do
     let args = unpackData rawJobData
-    undefined
     let job = Job (unpackData rawJobData)
                   (dataCallback jobHandle outChan)
                   (warningCallback jobHandle outChan)
                   (statusCallback jobHandle outChan)
-    jobFunc job
+    res <- jobFunc job
+    case res of
+        Left err -> writeChan outChan $ buildErrorPacket jobHandle err
+        Right payload -> writeChan outChan $ buildWorkCompleteReq jobHandle payload
   where
     dataCallback h c payload    = writeChan c $ buildWorkDataReq h payload
     warningCallback h c payload = writeChan c $ buildWorkWarningReq h payload
     statusCallback h c status   = writeChan c $ buildWorkStatusReq h status
+    buildErrorPacket handle err = case err of
+        Nothing -> buildWorkFailReq handle
+        Just msg -> buildWorkExceptionReq handle msg
