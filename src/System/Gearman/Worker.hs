@@ -61,6 +61,7 @@ data JobSpec = JobSpec {
     jobName    :: S.ByteString,
     jobFunc    :: WorkerFunc,
     outChan    :: Chan S.ByteString,
+    semaphore  :: TBChan Bool,
     jobHandle  :: S.ByteString
 }
 
@@ -118,6 +119,7 @@ work = do
 -- |Run a worker with a job. 
 doWork :: JobSpec -> IO ()
 doWork JobSpec{..} = do
+    waitForWorkerSlot semaphore
     let args = unpackData rawJobData
     let job = Job (unpackData rawJobData)
                   (dataCallback jobHandle outChan)
@@ -127,6 +129,7 @@ doWork JobSpec{..} = do
     case res of
         Left err -> writeChan outChan $ buildErrorPacket jobHandle err
         Right payload -> writeChan outChan $ buildWorkCompleteReq jobHandle payload
+    openWorkerSlot semaphore
   where
     dataCallback h c payload    = writeChan c $ buildWorkDataReq h payload
     warningCallback h c payload = writeChan c $ buildWorkWarningReq h payload
@@ -134,3 +137,5 @@ doWork JobSpec{..} = do
     buildErrorPacket handle err = case err of
         Nothing -> buildWorkFailReq handle
         Just msg -> buildWorkExceptionReq handle msg
+    waitForWorkerSlot          = void . atomically . readTBChan 
+    openWorkerSlot             = atomically . flip writeTBChan  True
