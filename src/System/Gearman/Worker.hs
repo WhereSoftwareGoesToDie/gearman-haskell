@@ -91,7 +91,10 @@ runWorker :: Int -> Worker a -> Gearman a
 runWorker nWorkers (Worker action) = do
     outChan <- (liftIO . atomically) newTChan
     sem <- (liftIO . atomically . newTBChan) nWorkers
+    replicateM_ nWorkers $ seed sem
     evalStateT action $ Work M.empty nWorkers outChan sem
+  where
+    seed = liftIO . atomically . flip writeTBChan True
 
 -- |addFunc registers a function with the server as performable by a 
 -- worker.
