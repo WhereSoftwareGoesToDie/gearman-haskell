@@ -76,7 +76,7 @@ data Work = Work {
     funcMap :: FuncMap,
     nWorkers :: Int,
     workerMsgChan :: TChan S.ByteString,
-    workerJobChan :: TChan JobSpec
+    workerSemaphore :: TBChan Bool
 }
 
 -- |This monad maintains a worker's state, and must be run within
@@ -90,8 +90,8 @@ liftGearman = Worker . lift
 runWorker :: Int -> Worker a -> Gearman a
 runWorker nWorkers (Worker action) = do
     outChan <- (liftIO . atomically) newTChan
-    inChan <- (liftIO . atomically) newTChan
-    evalStateT action $ Work M.empty nWorkers outChan inChan
+    sem <- (liftIO . atomically . newTBChan) nWorkers
+    evalStateT action $ Work M.empty nWorkers outChan sem
 
 -- |addFunc registers a function with the server as performable by a 
 -- worker.
@@ -106,7 +106,7 @@ addFunc name f tout = do
     let packet = case timeout of
                     Nothing -> buildCanDoReq ident
                     Just t  -> buildCanDoTimeoutReq ident t
-    put $ Work (M.insert ident cap funcMap) nWorkers workerMsgChan workerJobChan
+    put $ Work (M.insert ident cap funcMap) nWorkers workerMsgChan workerSemaphore
     liftGearman $ sendPacket packet
 
 -- |startWork handles communication with the server, dispatching of 
