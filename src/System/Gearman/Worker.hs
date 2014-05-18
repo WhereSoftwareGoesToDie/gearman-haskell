@@ -114,16 +114,24 @@ addFunc name f tout = do
 
 -- |startWork handles communication with the server, dispatching of 
 -- worker threads and reporting of results.
-work :: Worker (Maybe GearmanError)
-work = do
+work :: Worker ()
+work = forever $ do
     Work{..} <- get
-    return Nothing
+    -- receive
+    gotOut <- (liftIO . noMessages) workerMsgChan >>= (return . not)
+    case gotOut of 
+        False -> return ()
+        True  -> readMessage workerMsgChan >>= sendMessage
+  where
+    noMessages = liftIO . atomically . isEmptyTChan
+    readMessage  = liftIO . atomically . readTChan
+    sendMessage = void . liftGearman . sendPacket
 
--- |Run a worker with a job. 
+-- |Run a worker with a job. This will block until there are fewer than 
+-- nWorkers running, and terminate when complete.
 doWork :: JobSpec -> IO ()
 doWork JobSpec{..} = do
     waitForWorkerSlot semaphore
-    let args = unpackData rawJobData
     let job = Job (unpackData rawJobData)
                   (dataCallback jobHandle outChan)
                   (warningCallback jobHandle outChan)
