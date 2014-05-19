@@ -60,7 +60,7 @@ data JobSpec = JobSpec {
     rawJobData :: S.ByteString,
     jobName    :: S.ByteString,
     jobFunc    :: WorkerFunc,
-    outChan    :: Chan S.ByteString,
+    outChan    :: TChan S.ByteString,
     semaphore  :: TBChan Bool,
     jobHandle  :: S.ByteString
 }
@@ -76,7 +76,8 @@ data Work = Work {
     funcMap :: FuncMap,
     nWorkers :: Int,
     workerMsgChan :: TChan S.ByteString,
-    workerSemaphore :: TBChan Bool
+    workerSemaphore :: TBChan Bool,
+    workerJobChan :: TChan JobSpec
 }
 
 -- |This monad maintains a worker's state, and must be run within
@@ -90,9 +91,10 @@ liftGearman = Worker . lift
 runWorker :: Int -> Worker a -> Gearman a
 runWorker nWorkers (Worker action) = do
     outChan <- (liftIO . atomically) newTChan
+    jobChan <- (liftIO . atomically) newTChan
     sem <- (liftIO . atomically . newTBChan) nWorkers
     replicateM_ nWorkers $ seed sem
-    evalStateT action $ Work M.empty nWorkers outChan sem
+    evalStateT action $ Work M.empty nWorkers outChan sem jobChan
   where
     seed = liftIO . atomically . flip writeTBChan True
 
@@ -109,7 +111,7 @@ addFunc name f tout = do
     let packet = case timeout of
                     Nothing -> buildCanDoReq ident
                     Just t  -> buildCanDoTimeoutReq ident t
-    put $ Work (M.insert ident cap funcMap) nWorkers workerMsgChan workerSemaphore
+    put $ Work (M.insert ident cap funcMap) nWorkers workerMsgChan workerSemaphore workerJobChan
     liftGearman $ sendPacket packet
 
 -- |startWork handles communication with the server, dispatching of 
@@ -117,6 +119,7 @@ addFunc name f tout = do
 work :: Worker ()
 work = forever $ do
     Work{..} <- get
+    liftIO $ async (return dispatchWorkers) >>= link
     -- receive
     gotOut <- (liftIO . noMessages) workerMsgChan >>= (return . not)
     case gotOut of 
@@ -125,7 +128,28 @@ work = forever $ do
   where
     noMessages = liftIO . atomically . isEmptyTChan
     readMessage  = liftIO . atomically . readTChan
+    -- FIXME: evil
     sendMessage = void . liftGearman . sendPacket
+
+waitForWorkerSlot :: TBChan Bool -> IO ()
+waitForWorkerSlot          = void . atomically . readTBChan 
+
+openWorkerSlot :: TBChan Bool -> IO ()
+openWorkerSlot             = atomically . flip writeTBChan  True
+
+dispatchWorkers :: Worker ()
+dispatchWorkers = forever $ do
+    Work{..} <- get
+    liftIO $ waitForWorkerSlot workerSemaphore
+    liftIO $ writeJobRequest workerMsgChan
+    spec <- liftIO $ readJob workerJobChan 
+    liftIO $ openWorkerSlot workerSemaphore
+    liftIO $ async (doWork spec) >>= link
+    return ()
+  where
+    writeJobRequest = atomically . flip writeTChan buildGrabJobReq
+    readJob = atomically . readTChan
+
 
 -- |Run a worker with a job. This will block until there are fewer than 
 -- nWorkers running, and terminate when complete.
@@ -138,15 +162,13 @@ doWork JobSpec{..} = do
                   (statusCallback jobHandle outChan)
     res <- jobFunc job
     case res of
-        Left err -> writeChan outChan $ buildErrorPacket jobHandle err
-        Right payload -> writeChan outChan $ buildWorkCompleteReq jobHandle payload
+        Left err -> (liftIO . atomically . writeTChan outChan) $ buildErrorPacket jobHandle err
+        Right payload -> (liftIO . atomically . writeTChan outChan) $ buildWorkCompleteReq jobHandle payload
     openWorkerSlot semaphore
   where
-    dataCallback h c payload    = writeChan c $ buildWorkDataReq h payload
-    warningCallback h c payload = writeChan c $ buildWorkWarningReq h payload
-    statusCallback h c status   = writeChan c $ buildWorkStatusReq h status
+    dataCallback h c payload    = (atomically . writeTChan c) $ buildWorkDataReq h payload
+    warningCallback h c payload = (atomically . writeTChan c) $ buildWorkWarningReq h payload
+    statusCallback h c status   = (atomically . writeTChan c) $ buildWorkStatusReq h status
     buildErrorPacket handle err = case err of
         Nothing -> buildWorkFailReq handle
         Just msg -> buildWorkExceptionReq handle msg
-    waitForWorkerSlot          = void . atomically . readTBChan 
-    openWorkerSlot             = atomically . flip writeTBChan  True
