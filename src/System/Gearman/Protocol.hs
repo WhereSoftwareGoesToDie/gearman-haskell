@@ -22,7 +22,8 @@ module System.Gearman.Protocol
     buildWorkExceptionReq,
     buildGrabJobReq,
     parseMagic,
-    parsePacketType
+    parsePacketType,
+    parseDataSize
 ) where
 
 import Prelude hiding (error)
@@ -281,21 +282,20 @@ parseMagic m = case m of
     "\0RES" -> Res
     _       -> UnknownMagic
 
-parsePacketType :: PacketMagic -> S.ByteString -> (Either GearmanError PacketHeader)
-parsePacketType magic d = case magic of
-    Req -> Left $ gearmanError 0 "worker got a REQ (this should never happen)"
-    UnknownMagic -> Left $ gearmanError 0 "invalid packet - no magic"
-    Res -> case (fromWord32 $ runGet getWord32be d) of
-        Left err -> Left err
-        Right x  -> case x of
-            EchoRes       -> Right echoRes
-            Error         -> Right error
-            Noop          -> Right noop
-            NoJob         -> Right noJob
-            JobAssign     -> Right jobAssign
-            JobAssignUniq -> Right jobAssignUniq
-            word          -> Left $ gearmanError 0 $ "unexpected " ++ (show word)
-            
+parsePacketType :: S.ByteString -> (Either GearmanError PacketHeader)
+parsePacketType d = case (fromWord32 $ runGet getWord32be d) of
+    Left err -> Left err
+    Right x  -> case x of
+        EchoRes       -> Right echoRes
+        Error         -> Right error
+        Noop          -> Right noop
+        NoJob         -> Right noJob
+        JobAssign     -> Right jobAssign
+        JobAssignUniq -> Right jobAssignUniq
+        word          -> Left $ gearmanError 0 $ "unexpected " ++ (show word)
+
+parseDataSize :: S.ByteString -> Int
+parseDataSize = fromEnum . runGet getWord32be
 
 -- |Return the ByteString representation of a PacketHeader.
 renderHeader :: PacketHeader -> S.ByteString
