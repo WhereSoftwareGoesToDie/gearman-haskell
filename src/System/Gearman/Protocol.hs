@@ -19,13 +19,13 @@ module System.Gearman.Protocol
     buildWorkStatusReq,
     buildWorkWarningReq,
     buildWorkFailReq,
-    buildWorkExceptionReq
+    buildWorkExceptionReq,
+    buildGrabJobReq
 ) where
 
 import Prelude hiding (error)
 import qualified Data.ByteString.Lazy as S
 import Data.Binary.Put
-import Control.Monad
 
 import qualified System.Gearman.Job as J
 
@@ -304,3 +304,6 @@ buildWorkStatusReq handle status =
   where
     args = handle : (map marshalWord32 $ toList status)
     toList t = [fst t, snd t]
+
+buildGrabJobReq :: S.ByteString
+buildGrabJobReq = renderHeader grabJob
