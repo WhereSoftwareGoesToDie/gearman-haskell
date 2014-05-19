@@ -6,8 +6,8 @@
 module System.Gearman.Protocol
 (
     PacketMagic(..),
-    PacketDomain,
-    PacketType,
+    PacketDomain(..),
+    PacketType(..),
     GearmanPacket(..),
     PacketHeader(..),
     packData,
@@ -49,7 +49,7 @@ data PacketMagic = Req | Res | UnknownMagic
 
 -- |Whether the packet type is sent/received by a client, a worker, 
 -- both, or is an unused code.
-data PacketDomain = Client | Worker | Both | None
+data PacketDomain = DomainClient | DomainWorker | DomainBoth | DomainNone
 
 -- |Packet types, enumerated for 0-36 (and defined for {1-4,6-36}). 
 data PacketType =   NullByte
@@ -145,131 +145,131 @@ data GearmanPacket = GearmanPacket {
 }
 
 canDo               :: PacketHeader
-canDo               = PacketHeader CanDo Req Worker
+canDo               = PacketHeader CanDo Req DomainWorker
 
 cantDo              :: PacketHeader
-cantDo              = PacketHeader CantDo Req Worker
+cantDo              = PacketHeader CantDo Req DomainWorker
 
 resetAbilities      :: PacketHeader
-resetAbilities      = PacketHeader ResetAbilities Req Worker
+resetAbilities      = PacketHeader ResetAbilities Req DomainWorker
 
 preSleep            :: PacketHeader
-preSleep            = PacketHeader PreSleep Req Worker
+preSleep            = PacketHeader PreSleep Req DomainWorker
 
 unused1             :: PacketHeader
-unused1             = PacketHeader Unused1 UnknownMagic None
+unused1             = PacketHeader Unused1 UnknownMagic DomainNone
 
 noop                :: PacketHeader
-noop                = PacketHeader Noop Res Worker
+noop                = PacketHeader Noop Res DomainWorker
 
 submitJob           :: PacketHeader
-submitJob           = PacketHeader SubmitJob Res Worker
+submitJob           = PacketHeader SubmitJob Res DomainWorker
 
 
 jobCreated          :: PacketHeader
-jobCreated          = PacketHeader JobCreated Req Client
+jobCreated          = PacketHeader JobCreated Req DomainClient
 
 grabJob             :: PacketHeader
-grabJob             = PacketHeader GrabJob Res Client
+grabJob             = PacketHeader GrabJob Res DomainClient
 
 noJob               :: PacketHeader
-noJob               = PacketHeader NoJob Req Worker
+noJob               = PacketHeader NoJob Req DomainWorker
 
 jobAssign           :: PacketHeader
-jobAssign           = PacketHeader JobAssign Res Worker
+jobAssign           = PacketHeader JobAssign Res DomainWorker
 
 workStatusWorker    :: PacketHeader
-workStatusWorker    = PacketHeader WorkStatus Req Worker
+workStatusWorker    = PacketHeader WorkStatus Req DomainWorker
 
 workStatusClient    :: PacketHeader
-workStatusClient    = PacketHeader WorkStatus Res Client
+workStatusClient    = PacketHeader WorkStatus Res DomainClient
 
 workCompleteWorker  :: PacketHeader
-workCompleteWorker  = PacketHeader WorkComplete Req Worker
+workCompleteWorker  = PacketHeader WorkComplete Req DomainWorker
 
 workCompleteClient  :: PacketHeader
-workCompleteClient  = PacketHeader WorkComplete Res Client
+workCompleteClient  = PacketHeader WorkComplete Res DomainClient
 
 workFailWorker      :: PacketHeader
-workFailWorker      = PacketHeader WorkFail Req Worker
+workFailWorker      = PacketHeader WorkFail Req DomainWorker
 
 workFailClient      :: PacketHeader
-workFailClient      = PacketHeader WorkFail Res Client
+workFailClient      = PacketHeader WorkFail Res DomainClient
 
 getStatus           :: PacketHeader
-getStatus           = PacketHeader GetStatus Req Client
+getStatus           = PacketHeader GetStatus Req DomainClient
 
 echoReq             :: PacketHeader
-echoReq             = PacketHeader EchoReq Req Both
+echoReq             = PacketHeader EchoReq Req DomainBoth
 
 echoRes             :: PacketHeader
-echoRes             = PacketHeader EchoRes Res Both
+echoRes             = PacketHeader EchoRes Res DomainBoth
 
 submitJobBg         :: PacketHeader
-submitJobBg         = PacketHeader SubmitJobBg Req Client
+submitJobBg         = PacketHeader SubmitJobBg Req DomainClient
 
 error               :: PacketHeader
-error               = PacketHeader Error Res Both
+error               = PacketHeader Error Res DomainBoth
 
 statusRes           :: PacketHeader
-statusRes           = PacketHeader StatusRes Res Client
+statusRes           = PacketHeader StatusRes Res DomainClient
 
 submitJobHigh       :: PacketHeader
-submitJobHigh       = PacketHeader SubmitJobHigh Req Client
+submitJobHigh       = PacketHeader SubmitJobHigh Req DomainClient
 
 setClientId         :: PacketHeader
-setClientId         = PacketHeader SetClientId Req Worker
+setClientId         = PacketHeader SetClientId Req DomainWorker
 
 canDoTimeout        :: PacketHeader
-canDoTimeout        = PacketHeader CanDoTimeout Req Worker
+canDoTimeout        = PacketHeader CanDoTimeout Req DomainWorker
 
 allYours            :: PacketHeader
-allYours            = PacketHeader AllYours Req Worker
+allYours            = PacketHeader AllYours Req DomainWorker
 
 workExceptionWorker :: PacketHeader
-workExceptionWorker = PacketHeader WorkException Req Worker
+workExceptionWorker = PacketHeader WorkException Req DomainWorker
 
 workExceptionClient :: PacketHeader
-workExceptionClient = PacketHeader WorkException Res Client
+workExceptionClient = PacketHeader WorkException Res DomainClient
 
 optionReq           :: PacketHeader
-optionReq           = PacketHeader OptionReq Req Both
+optionReq           = PacketHeader OptionReq Req DomainBoth
 
 optionRes           :: PacketHeader
-optionRes           = PacketHeader OptionRes Res Both
+optionRes           = PacketHeader OptionRes Res DomainBoth
 
 workDataWorker      :: PacketHeader
-workDataWorker      = PacketHeader WorkData Req Worker
+workDataWorker      = PacketHeader WorkData Req DomainWorker
 
 workDataClient      :: PacketHeader
-workDataClient      = PacketHeader WorkData Res Client
+workDataClient      = PacketHeader WorkData Res DomainClient
 
 workWarningWorker   :: PacketHeader
-workWarningWorker   = PacketHeader WorkWarning Req Worker
+workWarningWorker   = PacketHeader WorkWarning Req DomainWorker
 
 workWarningClient   :: PacketHeader
-workWarningClient   = PacketHeader WorkWarning Res Client
+workWarningClient   = PacketHeader WorkWarning Res DomainClient
 
 grabJobUniq         :: PacketHeader
-grabJobUniq         = PacketHeader GrabJobUniq Req Worker
+grabJobUniq         = PacketHeader GrabJobUniq Req DomainWorker
 
 jobAssignUniq       :: PacketHeader
-jobAssignUniq       = PacketHeader JobAssignUniq Res Worker
+jobAssignUniq       = PacketHeader JobAssignUniq Res DomainWorker
 
 submitJobHighBg     :: PacketHeader
-submitJobHighBg     = PacketHeader SubmitJobHighBg Req Client
+submitJobHighBg     = PacketHeader SubmitJobHighBg Req DomainClient
 
 submitJobLow        :: PacketHeader
-submitJobLow        = PacketHeader SubmitJobLow Req Client
+submitJobLow        = PacketHeader SubmitJobLow Req DomainClient
 
 submitJobLowBg      :: PacketHeader
-submitJobLowBg      = PacketHeader SubmitJobLowBg Req Client
+submitJobLowBg      = PacketHeader SubmitJobLowBg Req DomainClient
 
 submitJobSched      :: PacketHeader
-submitJobSched      = PacketHeader SubmitJobSched Req Client
+submitJobSched      = PacketHeader SubmitJobSched Req DomainClient
 
 submitJobEpoch      :: PacketHeader
-submitJobEpoch      = PacketHeader SubmitJobEpoch Req Client
+submitJobEpoch      = PacketHeader SubmitJobEpoch Req DomainClient
 
 -- | marshalWord32 returns the ByteString representation of 
 --   the supplied Int as a big-endian Word32. 

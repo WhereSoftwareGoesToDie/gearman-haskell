@@ -8,7 +8,8 @@ module System.Gearman.Connection(
     echo,
     runGearman,
     Gearman,
-    sendPacket
+    sendPacket,
+    recvPacket
 ) where
 
 import Prelude hiding (length)

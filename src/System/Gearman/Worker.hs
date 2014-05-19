@@ -48,7 +48,7 @@ newCapability ident f timeout = do
 
 -- |The data passed to a worker function when running a job.
 data Job = Job {
-    jobData :: [S.ByteString],
+    jobData     :: S.ByteString,
     sendWarning :: (S.ByteString -> IO ()),
     sendData    :: (S.ByteString -> IO ()),
     sendStatus  :: (JobStatus -> IO ())
@@ -56,7 +56,7 @@ data Job = Job {
 
 -- |The data passed to a worker when a job is received.
 data JobSpec = JobSpec {
-    rawJobData :: S.ByteString,
+    jobArg :: S.ByteString,
     jobName    :: S.ByteString,
     jobFunc    :: WorkerFunc,
     outChan    :: TChan S.ByteString,
@@ -74,7 +74,9 @@ type FuncMap = Map S.ByteString Capability
 data Work = Work {
     funcMap :: FuncMap,
     nWorkers :: Int,
-    workerMsgChan :: TChan S.ByteString,
+    -- FIXME: encapsulate this in a packet type
+    outgoingChan :: TChan S.ByteString,
+    incomingChan :: TChan GearmanPacket,
     workerSemaphore :: TBChan Bool,
     workerJobChan :: TChan JobSpec
 }
@@ -90,10 +92,11 @@ liftGearman = Worker . lift
 runWorker :: Int -> Worker a -> Gearman a
 runWorker nWorkers (Worker action) = do
     outChan <- (liftIO . atomically) newTChan
+    inChan <- (liftIO . atomically) newTChan
     jobChan <- (liftIO . atomically) newTChan
     sem <- (liftIO . atomically . newTBChan) nWorkers
     replicateM_ nWorkers $ seed sem
-    evalStateT action $ Work M.empty nWorkers outChan sem jobChan
+    evalStateT action $ Work M.empty nWorkers outChan inChan sem jobChan
   where
     seed = liftIO . atomically . flip writeTBChan True
 
@@ -110,16 +113,56 @@ addFunc name f tout = do
     let packet = case timeout of
                     Nothing -> buildCanDoReq ident
                     Just t  -> buildCanDoTimeoutReq ident t
-    put $ Work (M.insert ident cap funcMap) nWorkers workerMsgChan workerSemaphore workerJobChan
+    put $ Work (M.insert ident cap funcMap) nWorkers outgoingChan incomingChan workerSemaphore workerJobChan
     liftGearman $ sendPacket packet
 
 linkWorkerThread :: Worker a -> IO ()
 linkWorkerThread action = async (return action) >>= link
 
 receiver :: Worker ()
-receiver = do
+receiver = forever $ do
     Work{..} <- get
+    incoming <- liftGearman $ recvPacket DomainWorker
+    case incoming of 
+        Left err -> liftIO $ putStrLn (show err)
+        Right pkt -> liftIO $ atomically $ writeTChan incomingChan pkt
     return ()
+
+assignJob :: GearmanPacket -> Worker ()
+assignJob pkt = do
+    Work{..} <- get
+    let GearmanPacket{..} = pkt
+    let PacketHeader{..} = header
+    let spec = case (parseSpecs args) of 
+         Nothing                      -> Left "error: not enough arguments provided to JOB_ASSIGN"
+         Just (handle, fnId, dataArg) -> case (M.lookup fnId funcMap) of
+             Nothing -> Left $  "error: no function with name " ++ (show fnId)
+             Just Capability{..}  -> Right $ JobSpec dataArg
+                                                     fnId
+                                                     func
+                                                     outgoingChan                           
+                                                     workerSemaphore
+                                                     handle
+    case spec of 
+        Left err -> liftIO $ putStrLn err
+        Right js -> liftIO $ atomically $ writeTChan workerJobChan js
+  where
+    parseSpecs args = case args of
+        (handle:args') -> case args' of 
+            (fnId:args'') -> case args'' of
+                (dataArg:_)      -> Just (handle, fnId, dataArg)
+                []               -> Nothing
+            []           -> Nothing
+        []            -> Nothing
+
+routeIncoming :: GearmanPacket -> Worker ()
+routeIncoming pkt = do
+    let GearmanPacket{..} = pkt
+    let PacketHeader{..} = header
+    case packetType of
+        JobAssign -> assignJob pkt
+        JobAssignUniq -> assignJob pkt
+        typ           -> liftIO $ putStrLn $ "Unexpected packet of type " ++ (show packetType)
 
 -- |startWork handles communication with the server, dispatching of 
 -- worker threads and reporting of results.
@@ -128,10 +171,14 @@ work = forever $ do
     Work{..} <- get
     liftIO $ async (return dispatchWorkers) >>= link
     liftIO $ linkWorkerThread receiver
-    gotOut <- (liftIO . noMessages) workerMsgChan >>= (return . not)
+    gotOut <- (liftIO . noMessages) outgoingChan >>= (return . not)
     case gotOut of 
         False -> return ()
-        True  -> readMessage workerMsgChan >>= sendMessage
+        True  -> readMessage outgoingChan >>= sendMessage
+    gotIn <- (liftIO . noMessages) incomingChan >>= (return . not)
+    case gotIn of
+        False -> return ()
+        True  -> readMessage incomingChan >>= routeIncoming
   where
     noMessages = liftIO . atomically . isEmptyTChan
     readMessage  = liftIO . atomically . readTChan
@@ -148,7 +195,7 @@ dispatchWorkers :: Worker ()
 dispatchWorkers = forever $ do
     Work{..} <- get
     liftIO $ waitForWorkerSlot workerSemaphore
-    liftIO $ writeJobRequest workerMsgChan
+    liftIO $ writeJobRequest outgoingChan
     spec <- liftIO $ readJob workerJobChan 
     liftIO $ openWorkerSlot workerSemaphore
     liftIO $ async (doWork spec) >>= link
@@ -157,13 +204,12 @@ dispatchWorkers = forever $ do
     writeJobRequest = atomically . flip writeTChan buildGrabJobReq
     readJob = atomically . readTChan
 
-
 -- |Run a worker with a job. This will block until there are fewer than 
 -- nWorkers running, and terminate when complete.
 doWork :: JobSpec -> IO ()
 doWork JobSpec{..} = do
     waitForWorkerSlot semaphore
-    let job = Job (unpackData rawJobData)
+    let job = Job jobArg
                   (dataCallback jobHandle outChan)
                   (warningCallback jobHandle outChan)
                   (statusCallback jobHandle outChan)
