@@ -21,14 +21,18 @@ module System.Gearman.Protocol
     buildWorkFailReq,
     buildWorkExceptionReq,
     buildGrabJobReq,
-    parseMagic
+    parseMagic,
+    parsePacketType
 ) where
 
 import Prelude hiding (error)
 import qualified Data.ByteString.Lazy as S
+import Data.Word
 import Data.Binary.Put
+import Data.Binary.Get
 
 import qualified System.Gearman.Job as J
+import System.Gearman.Error
 
 -- |Whether the packet is a request, response or an unused code.
 --
@@ -85,6 +89,45 @@ data PacketType =   NullByte
                   | SubmitJobSched
                   | SubmitJobEpoch
   deriving (Read,Show,Eq,Ord,Enum)
+
+fromWord32 :: Word32 -> Either GearmanError PacketType 
+fromWord32 1 = Right CanDo
+fromWord32 2 = Right CantDo
+fromWord32 3 = Right ResetAbilities
+fromWord32 4 = Right PreSleep
+-- 5 is unused
+fromWord32 6 = Right Noop
+fromWord32 7 = Right SubmitJob
+fromWord32 8 = Right JobCreated
+fromWord32 9 = Right GrabJob
+fromWord32 10 = Right NoJob
+fromWord32 11 = Right JobAssign
+fromWord32 12 = Right WorkStatus
+fromWord32 13 = Right WorkComplete
+fromWord32 14 = Right WorkFail
+fromWord32 15 = Right GetStatus
+fromWord32 16 = Right EchoReq
+fromWord32 17 = Right EchoRes
+fromWord32 18 = Right SubmitJobBg
+fromWord32 19 = Right Error
+fromWord32 20 = Right StatusRes
+fromWord32 21 = Right SubmitJobHigh
+fromWord32 22 = Right SetClientId
+fromWord32 23 = Right CanDoTimeout
+fromWord32 24 = Right AllYours
+fromWord32 25 = Right WorkException
+fromWord32 26 = Right OptionReq
+fromWord32 27 = Right OptionRes
+fromWord32 28 = Right WorkData
+fromWord32 29 = Right WorkWarning
+fromWord32 30 = Right GrabJobUniq
+fromWord32 31 = Right JobAssignUniq
+fromWord32 32 = Right SubmitJobHighBg
+fromWord32 33 = Right SubmitJobLow
+fromWord32 34 = Right SubmitJobLowBg
+fromWord32 35 = Right SubmitJobSched
+fromWord32 36 = Right SubmitJobEpoch
+fromWord32 n = Left $ gearmanError 0 $ "invalid packet type: " ++ (show n)
 
 -- |PacketHeader encapsulates all the information in a packet except 
 -- for the data (and data size prefix). 
@@ -236,7 +279,23 @@ parseMagic :: S.ByteString -> PacketMagic
 parseMagic m = case m of
     "\0REQ" -> Req
     "\0RES" -> Res
-    otherwise -> UnknownMagic
+    _       -> UnknownMagic
+
+parsePacketType :: PacketMagic -> S.ByteString -> (Either GearmanError PacketHeader)
+parsePacketType magic d = case magic of
+    Req -> Left $ gearmanError 0 "worker got a REQ (this should never happen)"
+    UnknownMagic -> Left $ gearmanError 0 "invalid packet - no magic"
+    Res -> case (fromWord32 $ runGet getWord32be d) of
+        Left err -> Left err
+        Right x  -> case x of
+            EchoRes       -> Right echoRes
+            Error         -> Right error
+            Noop          -> Right noop
+            NoJob         -> Right noJob
+            JobAssign     -> Right jobAssign
+            JobAssignUniq -> Right jobAssignUniq
+            word          -> Left $ gearmanError 0 $ "unexpected " ++ (show word)
+            
 
 -- |Return the ByteString representation of a PacketHeader.
 renderHeader :: PacketHeader -> S.ByteString
