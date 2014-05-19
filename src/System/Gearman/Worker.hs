@@ -117,7 +117,9 @@ linkWorkerThread :: Worker a -> IO ()
 linkWorkerThread action = async (return action) >>= link
 
 receiver :: Worker ()
-receiver = undefined
+receiver = do
+    Work{..} <- get
+    return ()
 
 -- |startWork handles communication with the server, dispatching of 
 -- worker threads and reporting of results.

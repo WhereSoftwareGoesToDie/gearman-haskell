@@ -38,7 +38,8 @@ import qualified System.Gearman.Job as J
 -- >considered responses.
 --
 -- (http://gearman.org/protocol/)
-data PacketMagic = Req | Res | Unused 
+data PacketMagic = Req | Res | Unknown
+
 
 -- |Whether the packet type is sent/received by a client, a worker, 
 -- both, or is an unused code.
@@ -228,7 +229,13 @@ marshalWord32 n     = runPut $ putWord32be $ fromIntegral n
 renderMagic :: PacketMagic -> S.ByteString
 renderMagic Req = "\0REQ"
 renderMagic Res = "\0REP"
-renderMagic Unused = ""
+renderMagic Unknown = ""
+
+parseMagic :: S.ByteString -> PacketMagic
+parseMagic m = case m of
+    "\0REQ" -> Req
+    "\0RES" -> Res
+    otherwise -> Unknown
 
 -- |Return the ByteString representation of a PacketHeader.
 renderHeader :: PacketHeader -> S.ByteString
