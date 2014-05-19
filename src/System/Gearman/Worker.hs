@@ -14,7 +14,6 @@ module System.Gearman.Worker
 
 import Control.Applicative
 import Control.Concurrent.Async
-import Control.Concurrent.Chan
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TBChan
 import Control.Monad
@@ -114,13 +113,19 @@ addFunc name f tout = do
     put $ Work (M.insert ident cap funcMap) nWorkers workerMsgChan workerSemaphore workerJobChan
     liftGearman $ sendPacket packet
 
+linkWorkerThread :: Worker a -> IO ()
+linkWorkerThread action = async (return action) >>= link
+
+receiver :: Worker ()
+receiver = undefined
+
 -- |startWork handles communication with the server, dispatching of 
 -- worker threads and reporting of results.
 work :: Worker ()
 work = forever $ do
     Work{..} <- get
     liftIO $ async (return dispatchWorkers) >>= link
-    -- receive
+    liftIO $ linkWorkerThread receiver
     gotOut <- (liftIO . noMessages) workerMsgChan >>= (return . not)
     case gotOut of 
         False -> return ()
