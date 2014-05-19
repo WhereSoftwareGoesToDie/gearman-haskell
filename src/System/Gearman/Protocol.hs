@@ -8,7 +8,8 @@ module System.Gearman.Protocol
     PacketMagic(..),
     PacketDomain,
     PacketType,
-    PacketHeader,
+    GearmanPacket(..),
+    PacketHeader(..),
     packData,
     unpackData,
     buildEchoReq,
@@ -21,9 +22,8 @@ module System.Gearman.Protocol
     buildWorkFailReq,
     buildWorkExceptionReq,
     buildGrabJobReq,
-    parseMagic,
-    parsePacketType,
-    parseDataSize
+    parseDataSize,
+    parsePacket
 ) where
 
 import Prelude hiding (error)
@@ -136,6 +136,12 @@ data PacketHeader = PacketHeader {
     packetType :: PacketType,
     magic      :: PacketMagic,
     domain     :: PacketDomain
+}
+
+data GearmanPacket = GearmanPacket {
+    header   :: PacketHeader,
+    dataSize :: Int,
+    args     :: [S.ByteString]
 }
 
 canDo               :: PacketHeader
@@ -297,6 +303,21 @@ parsePacketType d = case (fromWord32 $ runGet getWord32be d) of
 parseDataSize :: S.ByteString -> Int
 parseDataSize = fromEnum . runGet getWord32be
 
+parsePacket :: PacketDomain ->
+               S.ByteString ->
+               S.ByteString ->
+               S.ByteString ->
+               S.ByteString ->
+               Either GearmanError GearmanPacket
+parsePacket domain magic typ dataSize args = do
+    case (parseMagic magic) of 
+        UnknownMagic -> Left $ gearmanError 0 "invalid packet magic"
+        magic' -> case (parsePacketType typ) of
+            Left err -> Left err
+            Right typ' -> Right $ GearmanPacket typ'
+                                                (parseDataSize dataSize)
+                                                (unpackData args)
+    
 -- |Return the ByteString representation of a PacketHeader.
 renderHeader :: PacketHeader -> S.ByteString
 renderHeader PacketHeader{..} =

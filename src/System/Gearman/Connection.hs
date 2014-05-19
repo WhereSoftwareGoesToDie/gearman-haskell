@@ -117,11 +117,13 @@ recvBytes n = do
     msg <- liftIO $ recvFrom sock 4
     return (fst msg)
 
-recvPacket :: Gearman (Either GearmanError S.ByteString)
-recvPacket = do
+-- Must restart connection if this fails.
+recvPacket :: PacketDomain -> Gearman (Either GearmanError GearmanPacket)
+recvPacket domain = do
     magicPart <- recvBytes 4
-    let magic = parseMagic $ char8ToLazy magicPart
-    case magic of
-        UnknownMagic -> return $ Left $ gearmanError 0 "Unknown packet magic"
-        Req     -> undefined
-        Res     -> undefined
+    packetTypePart <- recvBytes 4
+    dataSizePart <- recvBytes 4
+    let dataSize = parseDataSize $ char8ToLazy dataSizePart
+    argsPart <- recvBytes dataSize
+    return $ parsePacket domain (char8ToLazy magicPart) (char8ToLazy packetTypePart) (char8ToLazy dataSizePart) (char8ToLazy argsPart)
+
