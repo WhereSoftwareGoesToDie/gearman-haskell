@@ -1,5 +1,6 @@
 module System.Gearman.Util(
-    lazyToChar8
+    lazyToChar8,
+    char8ToLazy
 ) where
 
 import qualified Data.ByteString.Lazy as BL
@@ -9,3 +10,5 @@ import qualified Data.ByteString.Char8 as BC
 lazyToChar8 :: BL.ByteString -> BC.ByteString
 lazyToChar8 = BC.concat . BL.toChunks
 
+char8ToLazy :: BC.ByteString -> BL.ByteString
+char8ToLazy = BL.fromChunks . (:[])

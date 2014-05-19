@@ -5,7 +5,7 @@
 
 module System.Gearman.Protocol
 (
-    PacketMagic,
+    PacketMagic(..),
     PacketDomain,
     PacketType,
     PacketHeader,
@@ -20,7 +20,8 @@ module System.Gearman.Protocol
     buildWorkWarningReq,
     buildWorkFailReq,
     buildWorkExceptionReq,
-    buildGrabJobReq
+    buildGrabJobReq,
+    parseMagic
 ) where
 
 import Prelude hiding (error)
@@ -38,7 +39,7 @@ import qualified System.Gearman.Job as J
 -- >considered responses.
 --
 -- (http://gearman.org/protocol/)
-data PacketMagic = Req | Res | Unknown
+data PacketMagic = Req | Res | UnknownMagic
 
 
 -- |Whether the packet type is sent/received by a client, a worker, 
@@ -106,7 +107,7 @@ preSleep            :: PacketHeader
 preSleep            = PacketHeader PreSleep Req Worker
 
 unused1             :: PacketHeader
-unused1             = PacketHeader Unused1 Unused None
+unused1             = PacketHeader Unused1 UnknownMagic None
 
 noop                :: PacketHeader
 noop                = PacketHeader Noop Res Worker
@@ -229,13 +230,13 @@ marshalWord32 n     = runPut $ putWord32be $ fromIntegral n
 renderMagic :: PacketMagic -> S.ByteString
 renderMagic Req = "\0REQ"
 renderMagic Res = "\0REP"
-renderMagic Unknown = ""
+renderMagic UnknownMagic = ""
 
 parseMagic :: S.ByteString -> PacketMagic
 parseMagic m = case m of
     "\0REQ" -> Req
     "\0RES" -> Res
-    otherwise -> Unknown
+    otherwise -> UnknownMagic
 
 -- |Return the ByteString representation of a PacketHeader.
 renderHeader :: PacketHeader -> S.ByteString

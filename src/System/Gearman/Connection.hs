@@ -110,3 +110,18 @@ sendPacket packet = do
   where 
     sendError b = gearmanError 2 ("send failed: only sent " ++ (show b) ++ " bytes")
     prettyPrint = liftIO . putStrLn . show . L.unpack
+
+recvBytes :: Int -> Gearman (S.ByteString)
+recvBytes n = do
+    Connection{..} <- ask
+    msg <- liftIO $ recvFrom sock 4
+    return (fst msg)
+
+recvPacket :: Gearman (Either GearmanError S.ByteString)
+recvPacket = do
+    magicPart <- recvBytes 4
+    let magic = parseMagic $ char8ToLazy magicPart
+    case magic of
+        UnknownMagic -> return $ Left $ gearmanError 0 "Unknown packet magic"
+        Req     -> undefined
+        Res     -> undefined
