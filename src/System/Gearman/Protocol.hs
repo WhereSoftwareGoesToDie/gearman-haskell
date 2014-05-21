@@ -282,12 +282,15 @@ renderMagic Req = "\0REQ"
 renderMagic Res = "\0REP"
 renderMagic UnknownMagic = ""
 
+-- |Takes four bytes and returns the magic type. This is the first
+-- component of a Gearman packet.
 parseMagic :: S.ByteString -> PacketMagic
 parseMagic m = case m of
     "\0REQ" -> Req
     "\0RES" -> Res
     _       -> UnknownMagic
 
+-- |Takes four bytes and returns a packet type.
 parsePacketType :: S.ByteString -> (Either GearmanError PacketHeader)
 parsePacketType d = case (fromWord32 $ runGet getWord32be d) of
     Left err -> Left err
@@ -300,9 +303,15 @@ parsePacketType d = case (fromWord32 $ runGet getWord32be d) of
         JobAssignUniq -> Right jobAssignUniq
         word          -> Left $ gearmanError 0 $ "unexpected " ++ (show word)
 
+-- |Takes a 4-bytestring and returns the big-endian word32
+-- representation.
 parseDataSize :: S.ByteString -> Int
 parseDataSize = fromEnum . runGet getWord32be
 
+-- |Given a domain (either ClientDomain or WorkerDomain, depending on
+-- what's calling it) and four ByteStrings representing the four
+-- components of a packet (magic, type, data size and data), return an
+-- unmarshalled packet (or an error if the data is invalid). 
 parsePacket :: PacketDomain ->
                S.ByteString ->
                S.ByteString ->
@@ -384,7 +393,7 @@ buildWorkWarningReq :: J.JobHandle -> J.JobData -> S.ByteString
 buildWorkWarningReq handle payload =
     (S.append (renderHeader workWarningWorker)) $ packData [handle, payload]
 
--- |Construct a WORK_STATUS packet (send by workers to inform the server
+-- |Construct a WORK_STATUS packet (sent by workers to inform the server
 -- of the percentage of the job that has been completed). 
 buildWorkStatusReq :: J.JobHandle -> J.JobStatus -> S.ByteString
 buildWorkStatusReq handle status =
@@ -393,5 +402,7 @@ buildWorkStatusReq handle status =
     args = handle : (map marshalWord32 $ toList status)
     toList t = [fst t, snd t]
 
+-- |Construct a GRAB_JOB packet (sent by workers to inform the server
+-- it's ready for a new job).
 buildGrabJobReq :: S.ByteString
 buildGrabJobReq = renderHeader grabJob
