@@ -347,7 +347,9 @@ packData d          = runPut $ do
 -- | unpackData takes the data segment of a Gearman message (after the size 
 -- word) and returns a list of the message arguments.
 unpackData          :: S.ByteString -> [S.ByteString]
-unpackData          = (S.split . fromIntegral . fromEnum) '\0'
+unpackData dat      = case dat of 
+    "" -> []
+    d  -> (S.split . fromIntegral . fromEnum) '\0' d
 
 -- |Construct an ECHO_REQ packet.
 buildEchoReq        :: [S.ByteString] -> S.ByteString
