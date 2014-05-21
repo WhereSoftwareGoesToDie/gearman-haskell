@@ -138,6 +138,7 @@ data PacketHeader = PacketHeader {
     domain     :: PacketDomain
 }
 
+-- |Full Gearman packet.
 data GearmanPacket = GearmanPacket {
     header   :: PacketHeader,
     dataSize :: Int,

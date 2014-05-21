@@ -86,9 +86,12 @@ echo Connection{..} payload = do
     sendError b = gearmanError 2 ("echo failed: only sent " ++ (show b) ++ " bytes")
     recvError b = gearmanError 3 ("echo failed: only received " ++ (show b) ++ " bytes")
 
+-- |Clean up the Gearman monad and close the connection.
 cleanup :: Connection -> IO ()
 cleanup Connection{..} = N.sClose sock
 
+-- |Execute an action inside the Gearman monad, connecting to the
+-- provided host and port.
 runGearman :: String -> String -> Gearman a -> IO a
 runGearman host port (Gearman action) = do
     c <- connect host port
@@ -99,6 +102,8 @@ runGearman host port (Gearman action) = do
             liftIO $ cleanup x
             return r
 
+-- |Send a packet to the Gearman server. Treats bytes as opaque, does
+-- not do any serialisation. 
 sendPacket :: L.ByteString -> Gearman (Maybe GearmanError)
 sendPacket packet = do
     Connection{..} <- ask
@@ -112,6 +117,7 @@ sendPacket packet = do
     sendError b = gearmanError 2 ("send failed: only sent " ++ (show b) ++ " bytes")
     prettyPrint = liftIO . putStrLn . show . L.unpack
 
+-- |Receive n bytes from the Gearman server.
 recvBytes :: Int -> Gearman (S.ByteString)
 recvBytes n = do
     Connection{..} <- ask
