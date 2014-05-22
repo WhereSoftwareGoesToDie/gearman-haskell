@@ -4,12 +4,14 @@ module System.Gearman.Error
 (
     GearmanError,
     WorkerError,
-    gearmanError
+    gearmanError,
+    printError
 ) where
 
 import qualified Data.ByteString.Lazy as S
 import Data.String
 import Data.Int
+import System.IO
 
 data ErrorCode = ErrorCode Int32 deriving (Show)
 
@@ -30,3 +32,6 @@ data WorkerError = WorkerError {
 
 gearmanError :: Int32 -> [Char] -> GearmanError
 gearmanError code msg = GearmanError (ErrorCode code) (ErrorMessage (fromString msg))
+
+printError :: GearmanError -> IO ()
+printError = hPrint stderr

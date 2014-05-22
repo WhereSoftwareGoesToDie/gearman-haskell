@@ -162,7 +162,7 @@ routeIncoming pkt = do
     case packetType of
         JobAssign -> assignJob pkt
         JobAssignUniq -> assignJob pkt
-        typ           -> liftIO $ putStrLn $ "Unexpected packet of type " ++ (show packetType)
+        typ           -> liftIO $ putStrLn $ "Unexpected packet of type " ++ (show typ)
 
 -- |startWork handles communication with the server, dispatching of 
 -- worker threads and reporting of results.
@@ -182,8 +182,11 @@ work = forever $ do
   where
     noMessages = liftIO . atomically . isEmptyTChan
     readMessage  = liftIO . atomically . readTChan
-    -- FIXME: evil
-    sendMessage = void . liftGearman . sendPacket
+    sendMessage msg = do
+        res <- liftGearman $ sendPacket msg
+        case res of 
+            Nothing -> return ()
+            Just err -> liftIO $ printError err
 
 waitForWorkerSlot :: TBChan Bool -> IO ()
 waitForWorkerSlot          = void . atomically . readTBChan 
