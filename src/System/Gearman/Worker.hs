@@ -3,7 +3,7 @@
 
 module System.Gearman.Worker
 (
-    Job,
+    Job(..),
     WorkerFunc,
     JobError,
     addFunc,
