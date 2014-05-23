@@ -63,7 +63,7 @@ connect host port = do
     sock <- N.socket N.AF_INET N.Stream 6 -- Create new ipv4 TCP socket.
     ai <- getHostAddress host port
     case ai of 
-        Nothing -> return $ Left $ gearmanError 1 (fromString ("could not resolve address" ++ host))
+        Nothing -> return $ Left $ ("could not resolve address" ++ host)
         Just x  -> do
             N.connect sock $ (N.addrAddress x)
             return $ Right $ Connection sock
@@ -83,8 +83,8 @@ echo Connection{..} payload = do
                  | otherwise          -> return $ Just $ sendError sent
   where
     req = buildEchoReq payload
-    sendError b = gearmanError 2 ("echo failed: only sent " ++ (show b) ++ " bytes")
-    recvError b = gearmanError 3 ("echo failed: only received " ++ (show b) ++ " bytes")
+    sendError b = ("echo failed: only sent " ++ (show b) ++ " bytes")
+    recvError b = ("echo failed: only received " ++ (show b) ++ " bytes")
 
 -- |Clean up the Gearman monad and close the connection.
 cleanup :: Connection -> IO ()
@@ -114,7 +114,7 @@ sendPacket packet = do
                  | (sent == expected) -> return Nothing
                  | otherwise          -> return $ Just $ sendError sent
   where 
-    sendError b = gearmanError 2 ("send failed: only sent " ++ (show b) ++ " bytes")
+    sendError b = ("send failed: only sent " ++ (show b) ++ " bytes")
     prettyPrint = liftIO . putStrLn . show . L.unpack
 
 -- |Receive n bytes from the Gearman server.

@@ -128,7 +128,7 @@ fromWord32 33 = Right SubmitJobLow
 fromWord32 34 = Right SubmitJobLowBg
 fromWord32 35 = Right SubmitJobSched
 fromWord32 36 = Right SubmitJobEpoch
-fromWord32 n = Left $ gearmanError 0 $ "invalid packet type: " ++ (show n)
+fromWord32 n = Left $ "invalid packet type: " ++ (show n)
 
 -- |PacketHeader encapsulates all the information in a packet except 
 -- for the data (and data size prefix). 
@@ -302,7 +302,7 @@ parsePacketType d = case (fromWord32 $ runGet getWord32be d) of
         NoJob         -> Right noJob
         JobAssign     -> Right jobAssign
         JobAssignUniq -> Right jobAssignUniq
-        word          -> Left $ gearmanError 0 $ "unexpected " ++ (show word)
+        word          -> Left $ "unexpected " ++ (show word)
 
 -- |Takes a 4-bytestring and returns the big-endian word32
 -- representation.
@@ -321,7 +321,7 @@ parsePacket :: PacketDomain ->
                Either GearmanError GearmanPacket
 parsePacket domain magic typ dataSize args = do
     case (parseMagic magic) of 
-        UnknownMagic -> Left $ gearmanError 0 "invalid packet magic"
+        UnknownMagic -> Left $ "invalid packet magic"
         magic' -> case (parsePacketType typ) of
             Left err -> Left err
             Right typ' -> Right $ GearmanPacket typ'
