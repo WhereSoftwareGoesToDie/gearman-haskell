@@ -21,8 +21,7 @@ import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.State.Strict
 import qualified Data.ByteString.Lazy as S
-import Data.Either
-import Data.Map (Map,empty)
+import Data.Map (Map)
 import qualified Data.Map as M
 
 import System.Gearman.Error
@@ -103,13 +102,12 @@ runWorker nWorkers (Worker action) = do
   where
     seed = liftIO . atomically . flip writeTBChan True
 
-newtype WorkAsync a = WorkAsync (StateT Work GearmanAsync a)
+newtype WorkAsync a = WorkAsync (StateT Work Gearman a)
     deriving (Functor, Applicative, Monad, MonadIO, MonadState Work)
 
-runWorkAsync :: WorkAsync a -> Worker (Async a)
-runWorkAsync (WorkAsync action) = do
+runWorkAsync :: Worker a -> Worker ()
+runWorkAsync (Worker action) = do
     w <- get
-    c <- liftGearman $ ask
     liftGearman $ runGearmanAsync $ evalStateT action w
 
 -- |addFunc registers a function with the server as performable by a 
@@ -128,16 +126,12 @@ addFunc name f tout = do
     put $ Work (M.insert ident cap funcMap) nWorkers outgoingChan incomingChan workerSemaphore workerJobChan
     liftGearman $ sendPacket packet
 
-linkWorkerThread :: Worker a -> IO ()
-linkWorkerThread action = async (return action) >>= link
-
-receiver :: Worker ()
-receiver = forever $ do
-    Work{..} <- get
-    incoming <- liftGearman $ recvPacket DomainWorker
+receiver :: TChan GearmanPacket -> Gearman ()
+receiver chan = forever $ do
+    incoming <- recvPacket DomainWorker
     case incoming of 
         Left err -> liftIO $ putStrLn (show err)
-        Right pkt -> liftIO $ atomically $ writeTChan incomingChan pkt
+        Right pkt -> liftIO $ atomically $ writeTChan chan pkt
     return ()
 
 assignJob :: GearmanPacket -> Worker ()
@@ -182,8 +176,8 @@ work :: Worker ()
 work = do
     Work{..} <- get
     liftIO $ putStrLn "dispatching workers"
-    runWorkAsync dispatchWorkers 
-    liftIO $ linkWorkerThread receiver
+    runWorkAsync dispatchWorkers
+    liftGearman $ runGearmanAsync (receiver incomingChan)
     liftIO $ putStrLn "threads spawned, entering main loop"
     forever $ do
         gotOut <- (liftIO . noMessages) outgoingChan >>= (return . not)
@@ -210,7 +204,7 @@ waitForWorkerSlot = void . atomically . readTBChan
 openWorkerSlot :: TBChan Bool -> IO ()
 openWorkerSlot = atomically . flip writeTBChan  True
 
-dispatchWorkers :: WorkAsync ()
+dispatchWorkers :: Worker ()
 dispatchWorkers = forever $ do
     liftIO $ putStrLn "worker thread"
     Work{..} <- get

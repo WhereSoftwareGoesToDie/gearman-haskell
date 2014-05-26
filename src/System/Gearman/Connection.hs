@@ -8,7 +8,7 @@ module System.Gearman.Connection(
     echo,
     runGearman,
     runGearmanAsync,
-    GearmanAsync,
+    GearmanAsync(..),
     Gearman,
     sendPacket,
     recvPacket
@@ -38,10 +38,11 @@ newtype Gearman a = Gearman (ReaderT Connection IO a)
 newtype GearmanAsync a = GearmanAsync (ReaderT Connection IO a)
     deriving (Functor, Applicative, Monad, MonadIO, MonadReader Connection)
 
-runGearmanAsync :: GearmanAsync a -> Gearman (Async a)
-runGearmanAsync (GearmanAsync action) = do
+runGearmanAsync :: Gearman a -> Gearman ()
+runGearmanAsync (Gearman action) = do
     c <- ask
-    liftIO $ async $ runReaderT action c
+    ac <- liftIO $ async $ runReaderT action c
+    liftIO $ link ac
 
 getHostAddress :: String -> String -> IO (Maybe N.AddrInfo)
 getHostAddress host port = do
