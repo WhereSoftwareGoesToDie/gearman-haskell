@@ -15,29 +15,17 @@ module System.Gearman.Connection(
 ) where
 
 import Prelude hiding (length)
-import Control.Exception
-import Control.Monad
 import Control.Applicative
 import Control.Monad.Trans
 import Control.Monad.Reader
-import Control.Monad.State
-import Control.Monad.State.Class
 import Control.Concurrent.Async
 import qualified Network.Socket as N
 import Network.Socket.ByteString
 import qualified Data.ByteString.Char8 as S
 import qualified Data.ByteString.Lazy as L
-import Data.Word
-import Data.Int
-import Data.String
-import Data.Either
-import Foreign.C.Types
-import GHC.IO.Handle
-import Numeric (showHex)
-import Control.Concurrent.MVar
 
 import System.Gearman.Error
-import System.Gearman.Protocol hiding (error)
+import System.Gearman.Protocol
 import System.Gearman.Util
 
 data Connection = Connection {
