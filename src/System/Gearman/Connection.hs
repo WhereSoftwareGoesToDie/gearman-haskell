@@ -131,6 +131,5 @@ recvPacket domain = do
     packetTypePart <- recvBytes 4
     dataSizePart <- recvBytes 4
     let dataSize = parseDataSize $ char8ToLazy dataSizePart
-    argsPart <- recvBytes dataSize
+    argsPart <- if dataSize > 0 then recvBytes dataSize else return ""
     return $ parsePacket domain (char8ToLazy magicPart) (char8ToLazy packetTypePart) (char8ToLazy dataSizePart) (char8ToLazy argsPart)
-
