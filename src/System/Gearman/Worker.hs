@@ -95,6 +95,7 @@ runWorker nWorkers (Worker action) = do
     inChan <- (liftIO . atomically) newTChan
     jobChan <- (liftIO . atomically) newTChan
     sem <- (liftIO . atomically . newTBChan) nWorkers
+    liftIO $ putStrLn $ "Seeding semaphore for " ++ (show nWorkers) ++ " workers"
     replicateM_ nWorkers $ seed sem
     evalStateT action $ Work M.empty nWorkers outChan inChan sem jobChan
   where
@@ -167,18 +168,20 @@ routeIncoming pkt = do
 -- |startWork handles communication with the server, dispatching of 
 -- worker threads and reporting of results.
 work :: Worker ()
-work = forever $ do
+work = do
     Work{..} <- get
+    liftIO $ putStrLn "dispatching workers"
     liftIO $ async (return dispatchWorkers) >>= link
     liftIO $ linkWorkerThread receiver
-    gotOut <- (liftIO . noMessages) outgoingChan >>= (return . not)
-    case gotOut of 
-        False -> return ()
-        True  -> readMessage outgoingChan >>= sendMessage
-    gotIn <- (liftIO . noMessages) incomingChan >>= (return . not)
-    case gotIn of
-        False -> return ()
-        True  -> readMessage incomingChan >>= routeIncoming
+    forever $ do
+        gotOut <- (liftIO . noMessages) outgoingChan >>= (return . not)
+        case gotOut of 
+            False -> return ()
+            True  -> readMessage outgoingChan >>= sendMessage
+        gotIn <- (liftIO . noMessages) incomingChan >>= (return . not)
+        case gotIn of
+            False -> return ()
+            True  -> readMessage incomingChan >>= routeIncoming
   where
     noMessages = liftIO . atomically . isEmptyTChan
     readMessage  = liftIO . atomically . readTChan
@@ -189,15 +192,17 @@ work = forever $ do
             Just err -> liftIO $ printError err
 
 waitForWorkerSlot :: TBChan Bool -> IO ()
-waitForWorkerSlot          = void . atomically . readTBChan 
+waitForWorkerSlot = void . atomically . readTBChan 
 
 openWorkerSlot :: TBChan Bool -> IO ()
-openWorkerSlot             = atomically . flip writeTBChan  True
+openWorkerSlot = atomically . flip writeTBChan  True
 
 dispatchWorkers :: Worker ()
 dispatchWorkers = forever $ do
     Work{..} <- get
+    liftIO $ putStrLn "worker thread: waiting on semaphore"
     liftIO $ waitForWorkerSlot workerSemaphore
+    liftIO $ putStrLn "worker thread: grabbing job"
     liftIO $ writeJobRequest outgoingChan
     spec <- liftIO $ readJob workerJobChan 
     liftIO $ openWorkerSlot workerSemaphore
