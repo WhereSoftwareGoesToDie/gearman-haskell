@@ -120,7 +120,7 @@ sendPacket packet = do
 recvBytes :: Int -> Gearman (S.ByteString)
 recvBytes n = do
     Connection{..} <- ask
-    msg <- liftIO $ recvFrom sock 4
+    msg <- liftIO $ recvFrom sock n
     return (fst msg)
 
 -- Must restart connection if this fails.
