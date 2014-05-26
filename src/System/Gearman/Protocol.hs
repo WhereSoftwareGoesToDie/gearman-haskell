@@ -280,7 +280,7 @@ marshalWord32 n     = runPut $ putWord32be $ fromIntegral n
 -- |Encode the 'magic' part of the packet header.
 renderMagic :: PacketMagic -> S.ByteString
 renderMagic Req = "\0REQ"
-renderMagic Res = "\0REP"
+renderMagic Res = "\0RES"
 renderMagic UnknownMagic = ""
 
 -- |Takes four bytes and returns the magic type. This is the first
@@ -337,8 +337,9 @@ renderHeader PacketHeader{..} =
 
 -- | packData takes a list of message parts (ByteStrings) and concatenates 
 --   them with null bytes in between and the length in front.
-packData            :: [S.ByteString] -> S.ByteString
-packData d          = runPut $ do
+packData    :: [S.ByteString] -> S.ByteString
+packData [] = runPut $ putWord32be 0 
+packData d  = runPut $ do
     putWord32be $ fromIntegral $ S.length (toPayload d)
     putLazyByteString $ toPayload d
   where
@@ -346,10 +347,9 @@ packData d          = runPut $ do
 
 -- | unpackData takes the data segment of a Gearman message (after the size 
 -- word) and returns a list of the message arguments.
-unpackData          :: S.ByteString -> [S.ByteString]
-unpackData dat      = case dat of 
-    "" -> []
-    d  -> (S.split . fromIntegral . fromEnum) '\0' d
+unpackData    :: S.ByteString -> [S.ByteString]
+unpackData "" = []
+unpackData d  = (S.split . fromIntegral . fromEnum) '\0' d
 
 -- |Construct an ECHO_REQ packet.
 buildEchoReq        :: [S.ByteString] -> S.ByteString
@@ -408,4 +408,4 @@ buildWorkStatusReq handle status =
 -- |Construct a GRAB_JOB packet (sent by workers to inform the server
 -- it's ready for a new job).
 buildGrabJobReq :: S.ByteString
-buildGrabJobReq = renderHeader grabJob
+buildGrabJobReq = S.append (renderHeader grabJob) (packData [])
