@@ -171,7 +171,7 @@ jobCreated          :: PacketHeader
 jobCreated          = PacketHeader JobCreated Req DomainClient
 
 grabJob             :: PacketHeader
-grabJob             = PacketHeader GrabJob Res DomainClient
+grabJob             = PacketHeader GrabJob Req DomainWorker
 
 noJob               :: PacketHeader
 noJob               = PacketHeader NoJob Req DomainWorker
