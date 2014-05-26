@@ -207,19 +207,22 @@ openWorkerSlot = atomically . flip writeTBChan  True
 
 dispatchWorkers :: Worker ()
 dispatchWorkers = forever $ do
-    liftIO $ putStrLn "worker thread"
     Work{..} <- get
     liftIO $ putStrLn "worker thread: waiting on semaphore"
     liftIO $ waitForWorkerSlot workerSemaphore
     liftIO $ putStrLn "worker thread: grabbing job"
     liftIO $ writeJobRequest outgoingChan
-    haveJobs <- (liftIO .atomically . isEmptyTChan) workerJobChan
-    if haveJobs then do
+    liftIO $ putStrLn "worker thread: reseeding semaphore"
+    liftIO $ openWorkerSlot workerSemaphore
+    noJobs <- (liftIO .atomically . isEmptyTChan) workerJobChan
+    if (not noJobs) then do
+        liftIO $ putStrLn "Reading job data."
         spec <- liftIO $ readJob workerJobChan 
-        liftIO $ openWorkerSlot workerSemaphore
         liftIO $ async (doWork spec) >>= link
         return ()
-    else return ()
+    else do
+        liftIO $ threadDelay 1000000
+        return ()
   where
     writeJobRequest = atomically . flip writeTChan buildGrabJobReq
     readJob = atomically . readTChan
