@@ -13,10 +13,12 @@ module System.Gearman.Worker
 ) where
 
 import Control.Applicative
+import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TBChan
 import Control.Monad
+import Control.Monad.Reader
 import Control.Monad.State.Strict
 import qualified Data.ByteString.Lazy as S
 import Data.Either
@@ -101,6 +103,15 @@ runWorker nWorkers (Worker action) = do
   where
     seed = liftIO . atomically . flip writeTBChan True
 
+newtype WorkAsync a = WorkAsync (StateT Work GearmanAsync a)
+    deriving (Functor, Applicative, Monad, MonadIO, MonadState Work)
+
+runWorkAsync :: WorkAsync a -> Worker (Async a)
+runWorkAsync (WorkAsync action) = do
+    w <- get
+    c <- liftGearman $ ask
+    liftGearman $ runGearmanAsync $ evalStateT action w
+
 -- |addFunc registers a function with the server as performable by a 
 -- worker.
 addFunc :: S.ByteString ->
@@ -171,8 +182,9 @@ work :: Worker ()
 work = do
     Work{..} <- get
     liftIO $ putStrLn "dispatching workers"
-    liftIO $ async (return dispatchWorkers) >>= link
+    runWorkAsync dispatchWorkers 
     liftIO $ linkWorkerThread receiver
+    liftIO $ putStrLn "threads spawned, entering main loop"
     forever $ do
         gotOut <- (liftIO . noMessages) outgoingChan >>= (return . not)
         case gotOut of 
@@ -182,6 +194,7 @@ work = do
         case gotIn of
             False -> return ()
             True  -> readMessage incomingChan >>= routeIncoming
+        liftIO $ threadDelay 10000
   where
     noMessages = liftIO . atomically . isEmptyTChan
     readMessage  = liftIO . atomically . readTChan
@@ -197,8 +210,9 @@ waitForWorkerSlot = void . atomically . readTBChan
 openWorkerSlot :: TBChan Bool -> IO ()
 openWorkerSlot = atomically . flip writeTBChan  True
 
-dispatchWorkers :: Worker ()
+dispatchWorkers :: WorkAsync ()
 dispatchWorkers = forever $ do
+    liftIO $ putStrLn "worker thread"
     Work{..} <- get
     liftIO $ putStrLn "worker thread: waiting on semaphore"
     liftIO $ waitForWorkerSlot workerSemaphore
