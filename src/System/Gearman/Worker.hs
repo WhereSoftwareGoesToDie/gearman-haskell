@@ -224,23 +224,30 @@ openWorkerSlot = atomically . flip writeTBChan  True
 dispatchWorkers :: Worker ()
 dispatchWorkers = forever $ do
     Work{..} <- get
-    liftIO $ putStrLn "worker thread: waiting on semaphore"
-    liftIO $ waitForWorkerSlot workerSemaphore
-    liftIO $ putStrLn "worker thread: grabbing job"
-    liftIO $ writeJobRequest outgoingChan
-    liftIO $ putStrLn "worker thread: reseeding semaphore"
-    liftIO $ openWorkerSlot workerSemaphore
-    noJobs <- (liftIO .atomically . isEmptyTChan) workerJobChan
-    if (not noJobs) then do
-        liftIO $ putStrLn "Reading job data."
-        spec <- liftIO $ readJob workerJobChan 
-        liftIO $ async (doWork spec) >>= link
-        return ()
-    else do
-        liftIO $ threadDelay 1000000
-        return ()
+    case processState of
+        WorkerConnected -> do
+            liftIO $ putStrLn "worker thread: waiting on semaphore"
+            liftIO $ waitForWorkerSlot workerSemaphore
+            liftIO $ putStrLn "worker thread: grabbing job"
+            liftIO $ writeJobRequest outgoingChan
+            liftIO $ putStrLn "worker thread: reseeding semaphore"
+            liftIO $ openWorkerSlot workerSemaphore
+            noJobs <- (liftIO .atomically . isEmptyTChan) workerJobChan
+            if (not noJobs) then do
+                liftIO $ putStrLn "Reading job data."
+                spec <- liftIO $ readJob workerJobChan 
+                liftIO $ async (doWork spec) >>= link
+                return ()
+            else do
+                liftIO $ threadDelay 1000000
+                liftIO $ writeSleep outgoingChan -- We will sleep until the server has jobs for us
+                w <- get
+                put (w { processState = WorkerSleeping })
+                return ()
+        WorkerSleeping -> liftIO $ threadDelay 1000000 >> return ()
   where
     writeJobRequest = atomically . flip writeTChan buildGrabJobReq
+    writeSleep = atomically . flip writeTChan buildPreSleepReq
     readJob = atomically . readTChan
 
 -- |Run a worker with a job. This will block until there are fewer than 
