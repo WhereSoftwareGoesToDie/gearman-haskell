@@ -71,6 +71,8 @@ type JobError = Maybe S.ByteString
 -- function identifiers read from the server and Haskell functions.
 type FuncMap = Map S.ByteString Capability
 
+data WorkerState = WorkerConnected | WorkerSleeping deriving (Show, Eq)
+
 -- |Internal state for the Worker monad.
 data Work = Work {
     funcMap :: FuncMap,
@@ -79,7 +81,8 @@ data Work = Work {
     outgoingChan :: TChan S.ByteString,
     incomingChan :: TChan GearmanPacket,
     workerSemaphore :: TBChan Bool,
-    workerJobChan :: TChan JobSpec
+    workerJobChan :: TChan JobSpec,
+    processState :: WorkerState
 }
 
 -- |This monad maintains a worker's state, and must be run within
@@ -98,7 +101,7 @@ runWorker nWorkers (Worker action) = do
     sem <- (liftIO . atomically . newTBChan) nWorkers
     liftIO $ putStrLn $ "Seeding semaphore for " ++ (show nWorkers) ++ " workers"
     replicateM_ nWorkers $ seed sem
-    evalStateT action $ Work M.empty nWorkers outChan inChan sem jobChan
+    evalStateT action $ Work M.empty nWorkers outChan inChan sem jobChan WorkerConnected
   where
     seed = liftIO . atomically . flip writeTBChan True
 
@@ -123,7 +126,13 @@ addFunc name f tout = do
     let packet = case timeout of
                     Nothing -> buildCanDoReq ident
                     Just t  -> buildCanDoTimeoutReq ident t
-    put $ Work (M.insert ident cap funcMap) nWorkers outgoingChan incomingChan workerSemaphore workerJobChan
+    put $ Work (M.insert ident cap funcMap) 
+               nWorkers 
+               outgoingChan 
+               incomingChan 
+               workerSemaphore 
+               workerJobChan 
+               processState
     liftGearman $ sendPacket packet
 
 receiver :: TChan GearmanPacket -> Gearman ()
