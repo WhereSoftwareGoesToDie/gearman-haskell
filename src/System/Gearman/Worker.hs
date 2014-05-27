@@ -134,6 +134,8 @@ receiver chan = forever $ do
         Right pkt -> liftIO $ atomically $ writeTChan chan pkt
     return ()
 
+-- |Given an ASSIGN_JOB or ASSIGN_JOB_UNIQ packet, give the job to a worker 
+-- thread.
 assignJob :: GearmanPacket -> Worker ()
 assignJob pkt = do
     Work{..} <- get
@@ -161,6 +163,7 @@ assignJob pkt = do
             []           -> Nothing
         []            -> Nothing
 
+-- |Handle an incoming packet from the Gearman server.
 routeIncoming :: GearmanPacket -> Worker ()
 routeIncoming pkt = do
     let GearmanPacket{..} = pkt
