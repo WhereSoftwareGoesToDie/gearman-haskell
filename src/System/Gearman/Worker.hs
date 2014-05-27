@@ -239,7 +239,7 @@ dispatchWorkers = forever $ do
                 liftIO $ async (doWork spec) >>= link
                 return ()
             else do
-                liftIO $ threadDelay 1000000
+                liftIO $ putStrLn "Going to sleep until the server has work for us."
                 liftIO $ writeSleep outgoingChan -- We will sleep until the server has jobs for us
                 w <- get
                 put (w { processState = WorkerSleeping })
