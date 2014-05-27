@@ -23,6 +23,7 @@ module System.Gearman.Protocol
     buildWorkExceptionReq,
     buildGrabJobReq,
     buildPreSleepReq,
+    buildNoopRes,
     parseDataSize,
     parsePacket
 ) where
@@ -415,3 +416,6 @@ buildGrabJobReq = S.append (renderHeader grabJob) (packData [])
 -- they are going to sleep). 
 buildPreSleepReq :: S.ByteString
 buildPreSleepReq = S.append (renderHeader preSleep) (packData [])
+
+buildNoopRes :: S.ByteString
+buildNoopRes = S.append (renderHeader noop) (packData [])
