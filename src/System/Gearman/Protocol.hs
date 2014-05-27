@@ -22,6 +22,7 @@ module System.Gearman.Protocol
     buildWorkFailReq,
     buildWorkExceptionReq,
     buildGrabJobReq,
+    buildPreSleepReq,
     parseDataSize,
     parsePacket
 ) where
@@ -409,3 +410,8 @@ buildWorkStatusReq handle status =
 -- it's ready for a new job).
 buildGrabJobReq :: S.ByteString
 buildGrabJobReq = S.append (renderHeader grabJob) (packData [])
+
+-- |Construct a PRE_SLEEP packet (sent by workers to inform the server
+-- they are going to sleep). 
+buildPreSleepReq :: S.ByteString
+buildPreSleepReq = S.append (renderHeader preSleep) (packData [])
