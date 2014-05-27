@@ -181,6 +181,10 @@ routeIncoming pkt = do
         JobAssign -> assignJob pkt
         JobAssignUniq -> assignJob pkt
         NoJob         -> liftIO $ putStrLn $ "Server has no jobs available."
+        Noop          -> do 
+            liftIO $ putStrLn $ "Server has woken us up."
+            w <- get
+            put (w { processState = WorkerConnected })
         typ           -> liftIO $ putStrLn $ "Unexpected packet of type " ++ (show typ)
 
 -- |startWork handles communication with the server, dispatching of 
