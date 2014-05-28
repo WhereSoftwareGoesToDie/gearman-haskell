@@ -417,5 +417,7 @@ buildGrabJobReq = S.append (renderHeader grabJob) (packData [])
 buildPreSleepReq :: S.ByteString
 buildPreSleepReq = S.append (renderHeader preSleep) (packData [])
 
+-- |Construct a NOOP packet (sent by the server to wake up a sleeping 
+-- worker). 
 buildNoopRes :: S.ByteString
 buildNoopRes = S.append (renderHeader noop) (packData [])
