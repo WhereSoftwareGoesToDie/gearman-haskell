@@ -22,6 +22,7 @@ module System.Gearman.Protocol
     buildWorkFailReq,
     buildWorkExceptionReq,
     buildGrabJobReq,
+    buildGrabJobUniqReq,
     buildPreSleepReq,
     buildNoopRes,
     parseDataSize,
@@ -411,6 +412,11 @@ buildWorkStatusReq handle status =
 -- it's ready for a new job).
 buildGrabJobReq :: S.ByteString
 buildGrabJobReq = S.append (renderHeader grabJob) (packData [])
+
+-- |Construct a GRAB_JOB_UNIQ packet (sent by workers to inform the server
+-- it's ready for a new job and it wants a unique client ID).
+buildGrabJobUniqReq :: S.ByteString
+buildGrabJobUniqReq = S.append (renderHeader grabJobUniq) (packData [])
 
 -- |Construct a PRE_SLEEP packet (sent by workers to inform the server
 -- they are going to sleep). 
