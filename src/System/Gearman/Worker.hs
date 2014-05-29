@@ -281,7 +281,7 @@ dispatchWorkers = forever $ do
                 return ()
         WorkerSleeping -> liftIO $ threadDelay 1000000 >> return ()
   where
-    writeJobRequest = atomically . flip writeTChan buildGrabJobUniqReq
+    writeJobRequest = atomically . flip writeTChan buildGrabJobReq
     writeSleep = atomically . flip writeTChan buildPreSleepReq
     readJob = atomically . readTChan
 
