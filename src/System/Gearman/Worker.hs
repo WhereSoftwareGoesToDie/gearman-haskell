@@ -156,16 +156,19 @@ assignJobUniq pkt = do
          Nothing                      -> Left "error: not enough arguments provided to JOB_ASSIGN_UNIQ"
          Just (handle, fnId, clientId, dataArg) -> case (M.lookup fnId funcMap) of
              Nothing -> Left $  "error: no function with name " ++ (show fnId)
-             Just Capability{..}  -> Right $ JobSpec dataArg
-                                                     fnId
-                                                     func
-                                                     outgoingChan                           
-                                                     workerSemaphore
-                                                     handle
-                                                     (Just clientId)
+             Just Capability{..}  ->
+                Right $ JobSpec dataArg
+                                fnId
+                                func
+                                outgoingChan                           
+                                workerSemaphore
+                                handle
+                                (Just clientId)
     case spec of 
         Left err -> liftIO $ putStrLn err
-        Right js -> liftIO $ atomically $ writeTChan workerJobChan js
+        Right js -> do
+            liftIO $ putStrLn "Assigning unique job."
+            liftIO $ atomically $ writeTChan workerJobChan js
   where
     parseSpecs args = case args of
         (handle:args') -> case args' of 
@@ -188,16 +191,19 @@ assignJob pkt = do
          Nothing                      -> Left "error: not enough arguments provided to JOB_ASSIGN"
          Just (handle, fnId, dataArg) -> case (M.lookup fnId funcMap) of
              Nothing -> Left $  "error: no function with name " ++ (show fnId)
-             Just Capability{..}  -> Right $ JobSpec dataArg
-                                                     fnId
-                                                     func
-                                                     outgoingChan                           
-                                                     workerSemaphore
-                                                     handle
-                                                     Nothing
+             Just Capability{..}  -> 
+                 Right $ JobSpec dataArg
+                                 fnId
+                                 func
+                                 outgoingChan                           
+                                 workerSemaphore
+                                 handle
+                                 Nothing
     case spec of 
         Left err -> liftIO $ putStrLn err
-        Right js -> liftIO $ atomically $ writeTChan workerJobChan js
+        Right js -> do
+            liftIO $ putStrLn "Assigning job."
+            liftIO $ atomically $ writeTChan workerJobChan js
   where
     parseSpecs args = case args of
         (handle:args') -> case args' of 
