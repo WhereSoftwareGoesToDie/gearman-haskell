@@ -346,7 +346,7 @@ packData d  = runPut $ do
     putWord32be $ fromIntegral $ S.length (toPayload d)
     putLazyByteString $ toPayload d
   where
-    toPayload s = S.append (S.intercalate "\0" s) "\0"
+    toPayload = S.intercalate "\0"
 
 -- | unpackData takes the data segment of a Gearman message (after the size 
 -- word) and returns a list of the message arguments.
