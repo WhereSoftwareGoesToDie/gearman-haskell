@@ -62,7 +62,8 @@ data JobSpec = JobSpec {
     jobFunc    :: WorkerFunc,
     outChan    :: TChan S.ByteString,
     semaphore  :: TBChan Bool,
-    jobHandle  :: S.ByteString
+    jobHandle  :: S.ByteString,
+    clientId   :: Maybe S.ByteString
 }
 
 type JobError = Maybe S.ByteString
@@ -143,6 +144,39 @@ receiver chan = forever $ do
         Right pkt -> liftIO $ atomically $ writeTChan chan pkt
     return ()
 
+
+-- |Given an ASSIGN_JOB or ASSIGN_JOB_UNIQ packet, give the job to a worker 
+-- thread.
+assignJobUniq :: GearmanPacket -> Worker ()
+assignJobUniq pkt = do
+    Work{..} <- get
+    let GearmanPacket{..} = pkt
+    let PacketHeader{..} = header
+    let spec = case (parseSpecs args) of 
+         Nothing                      -> Left "error: not enough arguments provided to JOB_ASSIGN_UNIQ"
+         Just (handle, fnId, clientId, dataArg) -> case (M.lookup fnId funcMap) of
+             Nothing -> Left $  "error: no function with name " ++ (show fnId)
+             Just Capability{..}  -> Right $ JobSpec dataArg
+                                                     fnId
+                                                     func
+                                                     outgoingChan                           
+                                                     workerSemaphore
+                                                     handle
+                                                     (Just clientId)
+    case spec of 
+        Left err -> liftIO $ putStrLn err
+        Right js -> liftIO $ atomically $ writeTChan workerJobChan js
+  where
+    parseSpecs args = case args of
+        (handle:args') -> case args' of 
+            (fnId:args'') -> case args'' of
+                (clientId:args''') -> case args''' of
+                    (dataArg:_)      -> Just (handle, fnId, clientId, dataArg)
+                    []               -> Nothing
+                []          -> Nothing
+            []           -> Nothing
+        []            -> Nothing
+
 -- |Given an ASSIGN_JOB or ASSIGN_JOB_UNIQ packet, give the job to a worker 
 -- thread.
 assignJob :: GearmanPacket -> Worker ()
@@ -160,6 +194,7 @@ assignJob pkt = do
                                                      outgoingChan                           
                                                      workerSemaphore
                                                      handle
+                                                     Nothing
     case spec of 
         Left err -> liftIO $ putStrLn err
         Right js -> liftIO $ atomically $ writeTChan workerJobChan js
@@ -179,7 +214,7 @@ routeIncoming pkt = do
     let PacketHeader{..} = header
     case packetType of
         JobAssign -> assignJob pkt
-        JobAssignUniq -> assignJob pkt
+        JobAssignUniq -> assignJobUniq pkt
         NoJob         -> liftIO $ putStrLn $ "Server has no jobs available."
         Noop          -> do 
             liftIO $ putStrLn $ "Server has woken us up."
