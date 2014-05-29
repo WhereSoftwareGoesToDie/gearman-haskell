@@ -281,9 +281,9 @@ dispatchWorkers = forever $ do
                 return ()
             else do
                 liftIO $ putStrLn "Going to sleep until the server has work for us."
-                --liftIO $ writeSleep outgoingChan -- We will sleep until the server has jobs for us
-                --w <- get
-                --put (w { processState = WorkerSleeping })
+                liftIO $ writeSleep outgoingChan -- We will sleep until the server has jobs for us
+                w <- get
+                put (w { processState = WorkerSleeping })
                 return ()
         WorkerSleeping -> liftIO $ threadDelay 1000000 >> return ()
   where
