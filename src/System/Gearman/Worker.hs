@@ -247,10 +247,8 @@ routeIncoming pkt = do
 work :: Worker ()
 work = do
     Work{..} <- get
-    liftIO $ putStrLn "dispatching workers"
     runWorkAsync dispatchWorkers
     liftGearman $ runGearmanAsync (receiver incomingChan)
-    liftIO $ putStrLn "threads spawned, entering main loop"
     forever $ do
         gotOut <- (liftIO . noMessages) outgoingChan >>= (return . not)
         case gotOut of 
