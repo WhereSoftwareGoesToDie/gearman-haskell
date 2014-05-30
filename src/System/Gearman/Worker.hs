@@ -74,6 +74,9 @@ data JobSpec = JobSpec {
     clientId   :: Maybe S.ByteString
 }
 
+-- Error returned by a job. A Nothing will be sent as a WORK_FAIL 
+-- packet; Just err will be sent as a WORK_EXCEPTION packet with err
+-- as the data argument.
 type JobError = Maybe S.ByteString
 
 -- |Maintained by the controller, defines the mapping between 
@@ -112,7 +115,6 @@ runWorker nWorkers (Worker action) = do
     inChan <- (liftIO . atomically) newTChan
     jobChan <- (liftIO . atomically) newTChan
     sem <- (liftIO . atomically . newTBChan) nWorkers
-    liftIO $ putStrLn $ "Seeding semaphore for " ++ (show nWorkers) ++ " workers"
     replicateM_ nWorkers $ seed sem
     stateVar <- liftIO $ newMVar WorkerConnected
     evalStateT action $ Work M.empty nWorkers outChan inChan sem jobChan stateVar
@@ -181,7 +183,6 @@ assignJobUniq pkt = do
     case spec of 
         Left err -> liftIO $ putStrLn err
         Right js -> do
-            liftIO $ putStrLn "Assigning unique job."
             liftIO $ atomically $ writeTChan workerJobChan js
   where
     parseSpecs args = case args of
@@ -216,7 +217,6 @@ assignJob pkt = do
     case spec of 
         Left err -> liftIO $ putStrLn err
         Right js -> do
-            liftIO $ putStrLn "Assigning job."
             liftIO $ atomically $ writeTChan workerJobChan js
   where
     parseSpecs args = case args of

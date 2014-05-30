@@ -117,13 +117,11 @@ sendPacket packet = do
     Connection{..} <- ask
     let expected = fromIntegral (S.length $ lazyToChar8 packet)
     sent <- liftIO $ send sock $ lazyToChar8 packet
-    prettyPrint packet
     case () of _
                  | (sent == expected) -> return Nothing
                  | otherwise          -> return $ Just $ sendError sent
   where 
     sendError b = ("send failed: only sent " ++ (show b) ++ " bytes")
-    prettyPrint = liftIO . putStrLn . show . L.unpack
 
 -- |Receive n bytes from the Gearman server.
 recvBytes :: Int -> Gearman (S.ByteString)
