@@ -236,7 +236,7 @@ routeIncoming pkt = do
     case packetType of
         JobAssign -> assignJob pkt
         JobAssignUniq -> assignJobUniq pkt
-        NoJob         -> liftIO $ putStrLn $ "Server has no jobs available."
+        NoJob         -> return () -- Server has no work for us, we do nothing; may want to sleep here instead.
         Noop          -> do 
             liftIO $ putStrLn $ "Server has woken us up."
             void $ liftIO $ swapMVar processState WorkerConnected
@@ -282,20 +282,15 @@ dispatchWorkers = forever $ do
     st <- liftIO $ readMVar processState
     case st of
         WorkerConnected -> do
-            liftIO $ putStrLn "worker thread: waiting on semaphore"
             liftIO $ waitForWorkerSlot workerSemaphore
-            liftIO $ putStrLn "worker thread: grabbing job"
             liftIO $ writeJobRequest outgoingChan
-            liftIO $ putStrLn "worker thread: reseeding semaphore"
             liftIO $ openWorkerSlot workerSemaphore
             noJobs <- (liftIO .atomically . isEmptyTChan) workerJobChan
             if (not noJobs) then do
-                liftIO $ putStrLn "Reading job data."
                 spec <- liftIO $ readJob workerJobChan 
                 liftIO $ async (doWork spec) >>= link
                 return ()
             else do
-                liftIO $ putStrLn "Going to sleep until the server has work for us."
                 liftIO $ writeSleep outgoingChan -- We will sleep until the server has jobs for us
                 void $ liftIO $ swapMVar processState WorkerSleeping
                 return ()
