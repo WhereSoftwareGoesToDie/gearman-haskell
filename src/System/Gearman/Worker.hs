@@ -187,7 +187,7 @@ assignJobUniq pkt = do
   where
     parseSpecs args = case args of
         (handle:args') -> case args' of 
-            (fnId:args'') -> case args'' of
+            fnId:args'') -> case args'' of
                 (clientId:args''') -> case args''' of
                     (dataArg:_)      -> Just (handle, fnId, clientId, dataArg)
                     []               -> Nothing
@@ -237,9 +237,7 @@ routeIncoming pkt = do
         JobAssign -> assignJob pkt
         JobAssignUniq -> assignJobUniq pkt
         NoJob         -> return () -- Server has no work for us, we do nothing; may want to sleep here instead.
-        Noop          -> do 
-            liftIO $ putStrLn $ "Server has woken us up."
-            void $ liftIO $ swapMVar processState WorkerConnected
+        Noop          -> void $ liftIO $ swapMVar processState WorkerConnected
         typ           -> liftIO $ putStrLn $ "Unexpected packet of type " ++ (show typ)
 
 -- |startWork handles communication with the server, dispatching of 
