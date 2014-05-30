@@ -187,7 +187,7 @@ assignJobUniq pkt = do
   where
     parseSpecs args = case args of
         (handle:args') -> case args' of 
-            fnId:args'') -> case args'' of
+            (fnId:args'') -> case args'' of
                 (clientId:args''') -> case args''' of
                     (dataArg:_)      -> Just (handle, fnId, clientId, dataArg)
                     []               -> Nothing
