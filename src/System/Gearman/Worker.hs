@@ -1,3 +1,11 @@
+-- This file is part of gearman-haskell.
+--
+-- Copyright 2014 Anchor Systems Pty Ltd and others.
+-- 
+-- The code in this file, and the program it is a part of, is made
+-- available to you by its authors as open source software: you can
+-- redistribute it and/or modify it under the terms of the BSD license.
+
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
@@ -94,6 +102,8 @@ newtype Worker a = Worker (StateT Work Gearman a)
 liftGearman :: Gearman a -> Worker a
 liftGearman = Worker . lift
 
+-- Runs an action in the Worker monad using the specified number of 
+-- worker threads to execute jobs.
 runWorker :: Int -> Worker a -> Gearman a
 runWorker nWorkers (Worker action) = do
     outChan <- (liftIO . atomically) newTChan
