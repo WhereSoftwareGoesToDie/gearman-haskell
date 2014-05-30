@@ -80,6 +80,8 @@ type JobError = Maybe S.ByteString
 -- function identifiers read from the server and Haskell functions.
 type FuncMap = Map S.ByteString Capability
 
+-- |Whether the worker is dormant because there's nothing for it to do 
+-- or not.
 data WorkerState = WorkerConnected | WorkerSleeping deriving (Show, Eq)
 
 -- |Internal state for the Worker monad.
@@ -91,7 +93,7 @@ data Work = Work {
     incomingChan :: TChan GearmanPacket,
     workerSemaphore :: TBChan Bool,
     workerJobChan :: TChan JobSpec,
-    processState :: WorkerState
+    processState :: MVar WorkerState
 }
 
 -- |This monad maintains a worker's state, and must be run within
@@ -112,7 +114,8 @@ runWorker nWorkers (Worker action) = do
     sem <- (liftIO . atomically . newTBChan) nWorkers
     liftIO $ putStrLn $ "Seeding semaphore for " ++ (show nWorkers) ++ " workers"
     replicateM_ nWorkers $ seed sem
-    evalStateT action $ Work M.empty nWorkers outChan inChan sem jobChan WorkerConnected
+    stateVar <- liftIO $ newMVar WorkerConnected
+    evalStateT action $ Work M.empty nWorkers outChan inChan sem jobChan stateVar
   where
     seed = liftIO . atomically . flip writeTBChan True
 
@@ -146,6 +149,7 @@ addFunc name f tout = do
                processState
     liftGearman $ sendPacket packet
 
+-- |Receiver handles incoming packets. 
 receiver :: TChan GearmanPacket -> Gearman ()
 receiver chan = forever $ do
     incoming <- recvPacket DomainWorker
@@ -226,6 +230,7 @@ assignJob pkt = do
 -- |Handle an incoming packet from the Gearman server.
 routeIncoming :: GearmanPacket -> Worker ()
 routeIncoming pkt = do
+    Work{..} <- get
     let GearmanPacket{..} = pkt
     let PacketHeader{..} = header
     case packetType of
@@ -234,8 +239,7 @@ routeIncoming pkt = do
         NoJob         -> liftIO $ putStrLn $ "Server has no jobs available."
         Noop          -> do 
             liftIO $ putStrLn $ "Server has woken us up."
-            w <- get
-            put (w { processState = WorkerConnected })
+            void $ liftIO $ swapMVar processState WorkerConnected
         typ           -> liftIO $ putStrLn $ "Unexpected packet of type " ++ (show typ)
 
 -- |startWork handles communication with the server, dispatching of 
@@ -275,7 +279,8 @@ openWorkerSlot = atomically . flip writeTBChan  True
 dispatchWorkers :: Worker ()
 dispatchWorkers = forever $ do
     Work{..} <- get
-    case processState of
+    st <- liftIO $ readMVar processState
+    case st of
         WorkerConnected -> do
             liftIO $ putStrLn "worker thread: waiting on semaphore"
             liftIO $ waitForWorkerSlot workerSemaphore
@@ -292,8 +297,7 @@ dispatchWorkers = forever $ do
             else do
                 liftIO $ putStrLn "Going to sleep until the server has work for us."
                 liftIO $ writeSleep outgoingChan -- We will sleep until the server has jobs for us
-                w <- get
-                put (w { processState = WorkerSleeping })
+                void $ liftIO $ swapMVar processState WorkerSleeping
                 return ()
         WorkerSleeping -> liftIO $ threadDelay 1000000 >> return ()
   where
