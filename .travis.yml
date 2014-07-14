@@ -1,13 +1,14 @@
 language: haskell
 
+env:
   - 'UBUNTU_RELEASE=saucy GHCVER=7.8.1 CABALVER=1.20'
   - 'UBUNTU_RELEASE=trusty GHCVER=7.8.1 CABALVER=1.20'
 
 before_install:
-  - sudo add-apt-repository -y "deb http://archive.ubuntu.com/ubuntu/ ${UBUNTU_RELEASE} main universe"
-  - sudo add-apt-repository -y ppa:hvr/ghc
-  - sudo apt-get update
-  - sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER happy
+  - 'sudo add-apt-repository -y "deb http://archive.ubuntu.com/ubuntu/ ${UBUNTU_RELEASE} main universe"'
+  - 'sudo add-apt-repository -y ppa:hvr/ghc'
+  - 'sudo apt-get update'
+  - 'sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER happy'
   - sudo apt-get remove libzmq1
   - wget http://download.zeromq.org/zeromq-4.0.4.tar.gz
   - tar -xf zeromq-4.0.4.tar.gz
