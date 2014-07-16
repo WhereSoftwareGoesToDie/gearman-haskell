@@ -7,17 +7,17 @@
 -- redistribute it and/or modify it under the terms of the BSD license.
 
 module System.Gearman.Util(
-    lazyToChar8,
-    char8ToLazy
+    lazyToStrictByteString,
+    strictToLazyByteString
 ) where
 
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString as BS
 
--- |lazyToChar8 converts a Lazy ByteString to a Char8 ByteString.
-lazyToChar8 :: BL.ByteString -> BC.ByteString
-lazyToChar8 = BC.concat . BL.toChunks
+-- |lazyToStrictByteString converts a Lazy ByteString to a StrictByteString ByteString.
+lazyToStrictByteString :: BL.ByteString -> BS.ByteString
+lazyToStrictByteString = BS.concat . BL.toChunks
 
--- |char8ToLazy converts a Char8 ByteString to a Lazy ByteString.
-char8ToLazy :: BC.ByteString -> BL.ByteString
-char8ToLazy = BL.fromChunks . (:[])
+-- |strictToLazyByteString converts a StrictByteString ByteString to a Lazy ByteString.
+strictToLazyByteString :: BS.ByteString -> BL.ByteString
+strictToLazyByteString = BL.fromChunks . (:[])

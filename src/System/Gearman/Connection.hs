@@ -80,8 +80,8 @@ connect host port = do
 --   echo packet. 
 echo :: Connection -> [L.ByteString] ->  IO (Maybe GearmanError)
 echo Connection{..} payload = do
-    sent <- send sock $ lazyToChar8 req
-    let expected = fromIntegral (S.length $ lazyToChar8 $ req)  
+    sent <- send sock $ lazyToStrictByteString req
+    let expected = fromIntegral (S.length $ lazyToStrictByteString $ req)  
     case () of _
                  | (sent == expected) -> do
                    rep <- recv sock 8
@@ -115,8 +115,8 @@ runGearman host port (Gearman action) = do
 sendPacket :: L.ByteString -> Gearman (Maybe GearmanError)
 sendPacket packet = do
     Connection{..} <- ask
-    let expected = fromIntegral (S.length $ lazyToChar8 packet)
-    sent <- liftIO $ send sock $ lazyToChar8 packet
+    let expected = fromIntegral (S.length $ lazyToStrictByteString packet)
+    sent <- liftIO $ send sock $ lazyToStrictByteString packet
     case () of _
                  | (sent == expected) -> return Nothing
                  | otherwise          -> return $ Just $ sendError sent
@@ -136,6 +136,6 @@ recvPacket domain = do
     magicPart <- recvBytes 4
     packetTypePart <- recvBytes 4
     dataSizePart <- recvBytes 4
-    let dataSize = parseDataSize $ char8ToLazy dataSizePart
+    let dataSize = parseDataSize $ strictToLazyByteString dataSizePart
     argsPart <- if dataSize > 0 then recvBytes dataSize else return ""
-    return $ parsePacket domain (char8ToLazy magicPart) (char8ToLazy packetTypePart) (char8ToLazy dataSizePart) (char8ToLazy argsPart)
+    return $ parsePacket domain (strictToLazyByteString magicPart) (strictToLazyByteString packetTypePart) (strictToLazyByteString dataSizePart) (strictToLazyByteString argsPart)
