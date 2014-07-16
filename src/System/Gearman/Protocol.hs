@@ -10,6 +10,9 @@
 {-# LANGUAGE RecordWildCards #-}
 
 -- Protocol documentation snippets from http://gearman.org/protocol/.
+-- The above is out of date; as far as I can tell the current protocol
+-- 'documentation' is the header files in the gearman source 
+-- distribution.
 
 module System.Gearman.Protocol
 (
