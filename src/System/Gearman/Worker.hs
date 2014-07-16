@@ -37,6 +37,8 @@ import System.Gearman.Connection
 import System.Gearman.Protocol
 import System.Gearman.Job
 
+-- |A WorkerFunc is a callback defined by the worker, taking a Job and
+-- returning either an error or some data.
 type WorkerFunc = (Job -> IO (Either JobError S.ByteString))
 
 -- |A Capability is something a worker can do.
