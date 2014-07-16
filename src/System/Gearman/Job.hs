@@ -31,6 +31,8 @@ type JobStatus = (Int, Int)
 
 data JobMsgPayload = JobWarning | JobData | JobStatus
 
+-- |A JobMessage is sent by a worker back to the server, where it can 
+-- be queried for by clients.
 data JobMessage = JobMessage {
     handle :: JobHandle,
     payload :: JobMsgPayload
