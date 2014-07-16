@@ -14,10 +14,12 @@ module System.Gearman.Util(
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
 
--- |lazyToStrictByteString converts a Lazy ByteString to a StrictByteString ByteString.
+-- |lazyToStrictByteString converts a lazy ByteString to a strict 
+-- ByteString.
 lazyToStrictByteString :: BL.ByteString -> BS.ByteString
 lazyToStrictByteString = BS.concat . BL.toChunks
 
--- |strictToLazyByteString converts a StrictByteString ByteString to a Lazy ByteString.
+-- |strictToLazyByteString converts a strict ByteString to a lazy 
+-- ByteString.
 strictToLazyByteString :: BS.ByteString -> BL.ByteString
 strictToLazyByteString = BL.fromChunks . (:[])
