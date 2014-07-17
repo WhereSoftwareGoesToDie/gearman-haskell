@@ -8,6 +8,7 @@
 
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GADTs #-}
 
 module System.Gearman.Worker
 (
@@ -26,6 +27,7 @@ import Control.Concurrent.Async
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TBChan
 import Control.Monad
+import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State.Strict
 import qualified Data.ByteString.Lazy as L
@@ -40,6 +42,10 @@ import System.Gearman.Job
 -- |A WorkerFunc is a callback defined by the worker, taking a Job and
 -- returning either an error or some data.
 type WorkerFunc = (Job -> IO (Either JobError L.ByteString))
+
+data Function m a where
+    Function  :: (L.ByteString -> Either JobError a) -> Function Identity a
+    FunctionM :: (L.ByteString -> m (Either JobError a)) -> Function m a
 
 -- |A Capability is something a worker can do.
 data Capability = Capability {

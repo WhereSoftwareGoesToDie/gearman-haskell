@@ -11,27 +11,47 @@ module System.Gearman.Job
     JobHandle,
     JobWarning,
     JobData,
-    JobStatus,
-    JobMsgPayload(..),
-    JobMessage(..)
+    JobStatus
+--    JobMsgPayload(..),
+--    JobMessage(..)
 ) where
 
 import qualified Data.ByteString.Lazy as L(ByteString)
-    
-type JobHandle  = L.ByteString
-type JobWarning = L.ByteString
-type JobData    = L.ByteString
+
+{-    
+newtype JobHandle = JobHandle {
+    unJobHandle :: L.ByteString
+}
+
+newtype JobWarning = JobWarning {
+    unJobWarning :: L.ByteString
+}
+
+newtype JobData = JobData {
+    unJobData :: L.ByteString
+}
 
 -- |Represents a fraction completed. First element is the numerator, 
 -- second is the denominator.
+newtype JobStatus = JobStatus {
+    unJobStatus :: (Int, Int) 
+}
+-}
+
+type JobHandle = L.ByteString
+type JobWarning = L.ByteString
+type JobData = L.ByteString
 type JobStatus = (Int, Int)
 
-data JobMsgPayload = JobWarning | JobData | JobStatus
+
+--data JobMsgPayload = WarningPayload JobWarning
+--                   | DataPayload JobData
+--                   | StatusPayload JobStatus
 
 -- |A JobMessage is sent by a worker back to the server, where it can 
 -- be queried for by clients.
-data JobMessage = JobMessage {
-    handle  :: JobHandle,
-    payload :: JobMsgPayload
-}
+--data JobMessage = JobMessage {
+--    handle  :: JobHandle,
+--    payload :: JobMsgPayload
+--}
 
