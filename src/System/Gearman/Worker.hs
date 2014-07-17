@@ -28,7 +28,7 @@ import Control.Concurrent.STM.TBChan
 import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.State.Strict
-import qualified Data.ByteString.Lazy as S
+import qualified Data.ByteString.Lazy as L
 import Data.Map (Map)
 import qualified Data.Map as M
 
@@ -39,18 +39,18 @@ import System.Gearman.Job
 
 -- |A WorkerFunc is a callback defined by the worker, taking a Job and
 -- returning either an error or some data.
-type WorkerFunc = (Job -> IO (Either JobError S.ByteString))
+type WorkerFunc = (Job -> IO (Either JobError L.ByteString))
 
 -- |A Capability is something a worker can do.
 data Capability = Capability {
-    ident   :: S.ByteString,
+    ident   :: L.ByteString,
     func    :: WorkerFunc,
     timeout :: Maybe Int
 }
 
 -- |Initialize a new Capability from initial job data.
-newCapability :: S.ByteString -> 
-                 (Job -> IO (Either JobError S.ByteString)) -> 
+newCapability :: L.ByteString -> 
+                 (Job -> IO (Either JobError L.ByteString)) -> 
                  Maybe Int ->
                  Worker Capability
 newCapability ident f timeout = do
@@ -59,31 +59,31 @@ newCapability ident f timeout = do
 
 -- |The data passed to a worker function when running a job.
 data Job = Job {
-    jobData     :: S.ByteString,
-    sendWarning :: (S.ByteString -> IO ()),
-    sendData    :: (S.ByteString -> IO ()),
+    jobData     :: L.ByteString,
+    sendWarning :: (L.ByteString -> IO ()),
+    sendData    :: (L.ByteString -> IO ()),
     sendStatus  :: (JobStatus -> IO ())
 }
 
 -- |The data passed to a worker when a job is received.
 data JobSpec = JobSpec {
-    jobArg      :: S.ByteString,
-    jobName     :: S.ByteString,
+    jobArg      :: L.ByteString,
+    jobName     :: L.ByteString,
     jobFunc     :: WorkerFunc,
-    outChan     :: TChan S.ByteString,
+    outChan     :: TChan L.ByteString,
     semaphore   :: TBChan Bool,
-    jobHandle   :: S.ByteString,
-    clientId    :: Maybe S.ByteString
+    jobHandle   :: L.ByteString,
+    clientId    :: Maybe L.ByteString
 }
 
 -- Error returned by a job. A Nothing will be sent as a WORK_FAIL 
 -- packet; Just err will be sent as a WORK_EXCEPTION packet with err
 -- as the data argument.
-type JobError = Maybe S.ByteString
+type JobError = Maybe L.ByteString
 
 -- |Maintained by the controller, defines the mapping between 
 -- function identifiers read from the server and Haskell functions.
-type FuncMap = Map S.ByteString Capability
+type FuncMap = Map L.ByteString Capability
 
 -- |Whether the worker is dormant because there's nothing for it to do 
 -- or not.
@@ -95,7 +95,7 @@ data Work = Work {
     funcMap         :: FuncMap,
     nWorkers        :: Int,
     -- FIXME: encapsulate this in a packet type
-    outgoingChan    :: TChan S.ByteString,
+    outgoingChan    :: TChan L.ByteString,
     incomingChan    :: TChan GearmanPacket,
     workerSemaphore :: TBChan Bool,
     workerJobChan   :: TChan JobSpec,
@@ -134,8 +134,8 @@ runWorkAsync (Worker action) = do
 
 -- |addFunc registers a function with the server as performable by a 
 -- worker.
-addFunc :: S.ByteString ->
-           (Job -> IO (Either JobError S.ByteString)) -> 
+addFunc :: L.ByteString ->
+           (Job -> IO (Either JobError L.ByteString)) -> 
            Maybe Int ->
            Worker (Maybe GearmanError)
 addFunc name f tout = do

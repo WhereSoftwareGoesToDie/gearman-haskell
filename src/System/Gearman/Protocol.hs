@@ -41,7 +41,7 @@ module System.Gearman.Protocol
 ) where
 
 import Prelude hiding (error)
-import qualified Data.ByteString.Lazy as S
+import qualified Data.ByteString.Lazy as L
 import Data.Word
 import Data.Binary.Put
 import Data.Binary.Get
@@ -155,7 +155,7 @@ data PacketHeader = PacketHeader {
 data GearmanPacket = GearmanPacket {
     header   :: PacketHeader,
     dataSize :: Int,
-    args     :: [S.ByteString]
+    args     :: [L.ByteString]
 }
 
 canDo               :: PacketHeader
@@ -286,25 +286,25 @@ submitJobEpoch      = PacketHeader SubmitJobEpoch Req DomainClient
 
 -- | marshalWord32 returns the ByteString representation of 
 --   the supplied Int as a big-endian Word32. 
-marshalWord32       :: Int -> S.ByteString
+marshalWord32       :: Int -> L.ByteString
 marshalWord32 n     = runPut $ putWord32be $ fromIntegral n
 
 -- |Encode the 'magic' part of the packet header.
-renderMagic :: PacketMagic -> S.ByteString
+renderMagic :: PacketMagic -> L.ByteString
 renderMagic Req = "\0REQ"
 renderMagic Res = "\0RES"
 renderMagic UnknownMagic = ""
 
 -- |Takes four bytes and returns the magic type. This is the first
 -- component of a Gearman packet.
-parseMagic :: S.ByteString -> PacketMagic
+parseMagic :: L.ByteString -> PacketMagic
 parseMagic m = case m of
     "\0REQ" -> Req
     "\0RES" -> Res
     _       -> UnknownMagic
 
 -- |Takes four bytes and returns a packet type.
-parsePacketType :: S.ByteString -> (Either GearmanError PacketHeader)
+parsePacketType :: L.ByteString -> (Either GearmanError PacketHeader)
 parsePacketType d = case (fromWord32 $ runGet getWord32be d) of
     Left err -> Left err
     Right x  -> case x of
@@ -318,7 +318,7 @@ parsePacketType d = case (fromWord32 $ runGet getWord32be d) of
 
 -- |Takes a 4-bytestring and returns the big-endian word32
 -- representation.
-parseDataSize :: S.ByteString -> Int
+parseDataSize :: L.ByteString -> Int
 parseDataSize = fromEnum . runGet getWord32be
 
 -- |Given a domain (either ClientDomain or WorkerDomain, depending on
@@ -326,10 +326,10 @@ parseDataSize = fromEnum . runGet getWord32be
 -- components of a packet (magic, type, data size and data), return an
 -- unmarshalled packet (or an error if the data is invalid). 
 parsePacket :: PacketDomain ->
-               S.ByteString ->
-               S.ByteString ->
-               S.ByteString ->
-               S.ByteString ->
+               L.ByteString ->
+               L.ByteString ->
+               L.ByteString ->
+               L.ByteString ->
                Either GearmanError GearmanPacket
 parsePacket domain magic typ dataSize args = do
     case (parseMagic magic) of 
@@ -341,7 +341,7 @@ parsePacket domain magic typ dataSize args = do
                                                 (unpackData args)
     
 -- |Return the ByteString representation of a PacketHeader.
-renderHeader :: PacketHeader -> S.ByteString
+renderHeader :: PacketHeader -> L.ByteString
 renderHeader PacketHeader{..} =
     runPut $ do 
         putLazyByteString (renderMagic magic) 
@@ -349,90 +349,90 @@ renderHeader PacketHeader{..} =
 
 -- | packData takes a list of message parts (ByteStrings) and concatenates 
 --   them with null bytes in between and the length in front.
-packData    :: [S.ByteString] -> S.ByteString
+packData    :: [L.ByteString] -> L.ByteString
 packData [] = runPut $ putWord32be 0 
 packData d  = runPut $ do
-    putWord32be $ fromIntegral $ S.length (toPayload d)
+    putWord32be $ fromIntegral $ L.length (toPayload d)
     putLazyByteString $ toPayload d
   where
-    toPayload = S.intercalate "\0"
+    toPayload = L.intercalate "\0"
 
 -- | unpackData takes the data segment of a Gearman message (after the size 
 -- word) and returns a list of the message arguments.
-unpackData    :: S.ByteString -> [S.ByteString]
+unpackData    :: L.ByteString -> [L.ByteString]
 unpackData "" = []
-unpackData d  = (S.split . fromIntegral . fromEnum) '\0' d
+unpackData d  = (L.split . fromIntegral . fromEnum) '\0' d
 
 -- |Construct an ECHO_REQ packet.
-buildEchoReq        :: [S.ByteString] -> S.ByteString
-buildEchoReq        = (S.append (renderHeader echoReq)) . packData
+buildEchoReq        :: [L.ByteString] -> L.ByteString
+buildEchoReq        = (L.append (renderHeader echoReq)) . packData
 
 -- |Construct a CAN_DO request packet (workers send these to register 
 -- functions with the server). 
-buildCanDoReq       :: S.ByteString -> S.ByteString
-buildCanDoReq       = (S.append (renderHeader canDo)) . packData . (:[])
+buildCanDoReq       :: L.ByteString -> L.ByteString
+buildCanDoReq       = (L.append (renderHeader canDo)) . packData . (:[])
 
 -- |Construct a CAN_DO_TIMEOUT packet (as above, but with a timeout value).
 -- FIXME: confirm timestamp format.
 buildCanDoTimeoutReq :: 
-    S.ByteString -> 
+    L.ByteString -> 
     Int -> 
-    S.ByteString
-buildCanDoTimeoutReq fn t = S.append (renderHeader canDoTimeout) (packData [fn, (marshalWord32 t)])
+    L.ByteString
+buildCanDoTimeoutReq fn t = L.append (renderHeader canDoTimeout) (packData [fn, (marshalWord32 t)])
 
 -- |Construct a WORK_COMPLETE packet (sent by workers when they 
 -- finish a job). 
-buildWorkCompleteReq :: J.JobHandle -> J.JobData -> S.ByteString
+buildWorkCompleteReq :: J.JobHandle -> J.JobData -> L.ByteString
 buildWorkCompleteReq handle response = 
-    (S.append (renderHeader workCompleteWorker)) $ packData [handle, response]
+    (L.append (renderHeader workCompleteWorker)) $ packData [handle, response]
 
 -- |Construct a WORK_FAIL packet (sent by workers to report a job 
 -- failure with no accompanying data). 
-buildWorkFailReq :: J.JobHandle -> S.ByteString
-buildWorkFailReq = (S.append (renderHeader workFailWorker)) . packData . (:[])
+buildWorkFailReq :: J.JobHandle -> L.ByteString
+buildWorkFailReq = (L.append (renderHeader workFailWorker)) . packData . (:[])
 
 -- |Construct a WORK_EXCEPTION packet (sent by workers to report a job
 -- failure with accompanying exception data). 
-buildWorkExceptionReq :: J.JobHandle -> S.ByteString -> S.ByteString
-buildWorkExceptionReq handle msg = (S.append (renderHeader workFailWorker)) $ packData [handle, msg]
+buildWorkExceptionReq :: J.JobHandle -> L.ByteString -> L.ByteString
+buildWorkExceptionReq handle msg = (L.append (renderHeader workFailWorker)) $ packData [handle, msg]
 
 -- |Construct a WORK_DATA packet (sent by workers when they have
 -- intermediate data to send for a job). 
-buildWorkDataReq :: J.JobHandle -> J.JobData -> S.ByteString
+buildWorkDataReq :: J.JobHandle -> J.JobData -> L.ByteString
 buildWorkDataReq handle payload =
-    (S.append (renderHeader workDataWorker)) $ packData [handle, payload]
+    (L.append (renderHeader workDataWorker)) $ packData [handle, payload]
 
 -- |Construct a WORK_WARNING packet (same as above, but treated as a 
 -- warning). 
-buildWorkWarningReq :: J.JobHandle -> J.JobData -> S.ByteString
+buildWorkWarningReq :: J.JobHandle -> J.JobData -> L.ByteString
 buildWorkWarningReq handle payload =
-    (S.append (renderHeader workWarningWorker)) $ packData [handle, payload]
+    (L.append (renderHeader workWarningWorker)) $ packData [handle, payload]
 
 -- |Construct a WORK_STATUS packet (sent by workers to inform the server
 -- of the percentage of the job that has been completed). 
-buildWorkStatusReq :: J.JobHandle -> J.JobStatus -> S.ByteString
+buildWorkStatusReq :: J.JobHandle -> J.JobStatus -> L.ByteString
 buildWorkStatusReq handle status =
-    (S.append (renderHeader workStatusWorker)) $ packData args
+    (L.append (renderHeader workStatusWorker)) $ packData args
   where
     args = handle : (map marshalWord32 $ toList status)
     toList t = [fst t, snd t]
 
 -- |Construct a GRAB_JOB packet (sent by workers to inform the server
 -- it's ready for a new job).
-buildGrabJobReq :: S.ByteString
-buildGrabJobReq = S.append (renderHeader grabJob) (packData [])
+buildGrabJobReq :: L.ByteString
+buildGrabJobReq = L.append (renderHeader grabJob) (packData [])
 
 -- |Construct a GRAB_JOB_UNIQ packet (sent by workers to inform the server
 -- it's ready for a new job and it wants a unique client ID).
-buildGrabJobUniqReq :: S.ByteString
-buildGrabJobUniqReq = S.append (renderHeader grabJobUniq) (packData [])
+buildGrabJobUniqReq :: L.ByteString
+buildGrabJobUniqReq = L.append (renderHeader grabJobUniq) (packData [])
 
 -- |Construct a PRE_SLEEP packet (sent by workers to inform the server
 -- they are going to sleep). 
-buildPreSleepReq :: S.ByteString
-buildPreSleepReq = S.append (renderHeader preSleep) (packData [])
+buildPreSleepReq :: L.ByteString
+buildPreSleepReq = L.append (renderHeader preSleep) (packData [])
 
 -- |Construct a NOOP packet (sent by the server to wake up a sleeping 
 -- worker). 
-buildNoopRes :: S.ByteString
-buildNoopRes = S.append (renderHeader noop) (packData [])
+buildNoopRes :: L.ByteString
+buildNoopRes = L.append (renderHeader noop) (packData [])
