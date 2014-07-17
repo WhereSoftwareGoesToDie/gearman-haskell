@@ -43,16 +43,16 @@ type WorkerFunc = (Job -> IO (Either JobError S.ByteString))
 
 -- |A Capability is something a worker can do.
 data Capability = Capability {
-    ident :: S.ByteString,
-    func :: WorkerFunc,
+    ident   :: S.ByteString,
+    func    :: WorkerFunc,
     timeout :: Maybe Int
 }
 
 -- |Initialize a new Capability from initial job data.
 newCapability :: S.ByteString -> 
-              (Job -> IO (Either JobError S.ByteString)) -> 
-              Maybe Int ->
-              Worker Capability
+                 (Job -> IO (Either JobError S.ByteString)) -> 
+                 Maybe Int ->
+                 Worker Capability
 newCapability ident f timeout = do
 --    outChan <- liftIO $ atomically $ newTBChan 1
     return $ Capability ident f timeout 
@@ -67,13 +67,13 @@ data Job = Job {
 
 -- |The data passed to a worker when a job is received.
 data JobSpec = JobSpec {
-    jobArg :: S.ByteString,
-    jobName    :: S.ByteString,
-    jobFunc    :: WorkerFunc,
-    outChan    :: TChan S.ByteString,
-    semaphore  :: TBChan Bool,
-    jobHandle  :: S.ByteString,
-    clientId   :: Maybe S.ByteString
+    jobArg      :: S.ByteString,
+    jobName     :: S.ByteString,
+    jobFunc     :: WorkerFunc,
+    outChan     :: TChan S.ByteString,
+    semaphore   :: TBChan Bool,
+    jobHandle   :: S.ByteString,
+    clientId    :: Maybe S.ByteString
 }
 
 -- Error returned by a job. A Nothing will be sent as a WORK_FAIL 
@@ -87,18 +87,19 @@ type FuncMap = Map S.ByteString Capability
 
 -- |Whether the worker is dormant because there's nothing for it to do 
 -- or not.
-data WorkerState = WorkerConnected | WorkerSleeping deriving (Show, Eq)
+data WorkerState = WorkerConnected | WorkerSleeping
+    deriving (Show, Eq)
 
 -- |Internal state for the Worker monad.
 data Work = Work {
-    funcMap :: FuncMap,
-    nWorkers :: Int,
+    funcMap         :: FuncMap,
+    nWorkers        :: Int,
     -- FIXME: encapsulate this in a packet type
-    outgoingChan :: TChan S.ByteString,
-    incomingChan :: TChan GearmanPacket,
+    outgoingChan    :: TChan S.ByteString,
+    incomingChan    :: TChan GearmanPacket,
     workerSemaphore :: TBChan Bool,
-    workerJobChan :: TChan JobSpec,
-    processState :: MVar WorkerState
+    workerJobChan   :: TChan JobSpec,
+    processState    :: MVar WorkerState
 }
 
 -- |This monad maintains a worker's state, and must be run within
@@ -114,9 +115,9 @@ liftGearman = Worker . lift
 runWorker :: Int -> Worker a -> Gearman a
 runWorker nWorkers (Worker action) = do
     outChan <- (liftIO . atomically) newTChan
-    inChan <- (liftIO . atomically) newTChan
+    inChan  <- (liftIO . atomically) newTChan
     jobChan <- (liftIO . atomically) newTChan
-    sem <- (liftIO . atomically . newTBChan) nWorkers
+    sem     <- (liftIO . atomically . newTBChan) nWorkers
     replicateM_ nWorkers $ seed sem
     stateVar <- liftIO $ newMVar WorkerConnected
     evalStateT action $ Work M.empty nWorkers outChan inChan sem jobChan stateVar
@@ -139,8 +140,7 @@ addFunc :: S.ByteString ->
            Worker (Maybe GearmanError)
 addFunc name f tout = do
     Work{..} <- get
-    cap <- newCapability name f tout
-    let Capability{..} = cap
+    cap@Capability{..} <- newCapability name f tout
     let packet = case timeout of
                     Nothing -> buildCanDoReq ident
                     Just t  -> buildCanDoTimeoutReq ident t
@@ -187,15 +187,8 @@ assignJobUniq pkt = do
         Right js -> do
             liftIO $ atomically $ writeTChan workerJobChan js
   where
-    parseSpecs args = case args of
-        (handle:args') -> case args' of 
-            (fnId:args'') -> case args'' of
-                (clientId:args''') -> case args''' of
-                    (dataArg:_)      -> Just (handle, fnId, clientId, dataArg)
-                    []               -> Nothing
-                []          -> Nothing
-            []           -> Nothing
-        []            -> Nothing
+    parseSpecs (handle:fnId:clientId:dataArg:_) = Just (handle, fnId, clientId, dataArg)
+    parseSpecs _                                = Nothing
 
 -- |Given an ASSIGN_JOB or ASSIGN_JOB_UNIQ packet, give the job to a worker 
 -- thread.
@@ -221,13 +214,8 @@ assignJob pkt = do
         Right js -> do
             liftIO $ atomically $ writeTChan workerJobChan js
   where
-    parseSpecs args = case args of
-        (handle:args') -> case args' of 
-            (fnId:args'') -> case args'' of
-                (dataArg:_)      -> Just (handle, fnId, dataArg)
-                []               -> Nothing
-            []           -> Nothing
-        []            -> Nothing
+    parseSpecs (handle:fnId:dataArg:_) = Just (handle, fnId, dataArg)
+    parseSpecs _                       = Nothing
 
 -- |Handle an incoming packet from the Gearman server.
 routeIncoming :: GearmanPacket -> Worker ()
@@ -260,12 +248,12 @@ work = do
             True  -> readMessage incomingChan >>= routeIncoming
         liftIO $ threadDelay 10000
   where
-    noMessages = liftIO . atomically . isEmptyTChan
-    readMessage  = liftIO . atomically . readTChan
+    noMessages  = liftIO . atomically . isEmptyTChan
+    readMessage = liftIO . atomically . readTChan
     sendMessage msg = do
         res <- liftGearman $ sendPacket msg
         case res of 
-            Nothing -> return ()
+            Nothing  -> return ()
             Just err -> liftIO $ printError err
 
 waitForWorkerSlot :: TBChan Bool -> IO ()
@@ -279,24 +267,24 @@ dispatchWorkers = forever $ do
     Work{..} <- get
     st <- liftIO $ readMVar processState
     case st of
-        WorkerConnected -> do
-            liftIO $ waitForWorkerSlot workerSemaphore
-            liftIO $ writeJobRequest outgoingChan
-            liftIO $ openWorkerSlot workerSemaphore
-            noJobs <- (liftIO .atomically . isEmptyTChan) workerJobChan
+        WorkerConnected -> liftIO $ do
+            waitForWorkerSlot workerSemaphore
+            writeJobRequest outgoingChan
+            openWorkerSlot workerSemaphore
+            noJobs <- (atomically . isEmptyTChan) workerJobChan
             if (not noJobs) then do
-                spec <- liftIO $ readJob workerJobChan 
-                liftIO $ async (doWork spec) >>= link
+                spec <- readJob workerJobChan 
+                async (doWork spec) >>= link
                 return ()
             else do
-                liftIO $ writeSleep outgoingChan -- We will sleep until the server has jobs for us
-                void $ liftIO $ swapMVar processState WorkerSleeping
+                writeSleep outgoingChan -- We will sleep until the server has jobs for us
+                void $ swapMVar processState WorkerSleeping
                 return ()
         WorkerSleeping -> liftIO $ threadDelay 1000000 >> return ()
   where
     writeJobRequest = atomically . flip writeTChan buildGrabJobReq
-    writeSleep = atomically . flip writeTChan buildPreSleepReq
-    readJob = atomically . readTChan
+    writeSleep      = atomically . flip writeTChan buildPreSleepReq
+    readJob         = atomically . readTChan
 
 -- |Run a worker with a job. This will block until there are fewer than 
 -- nWorkers running, and terminate when complete.
@@ -304,18 +292,18 @@ doWork :: JobSpec -> IO ()
 doWork JobSpec{..} = do
     waitForWorkerSlot semaphore
     let job = Job jobArg
-                  (dataCallback jobHandle outChan)
+                  (dataCallback    jobHandle outChan)
                   (warningCallback jobHandle outChan)
-                  (statusCallback jobHandle outChan)
+                  (statusCallback  jobHandle outChan)
     res <- jobFunc job
     case res of
-        Left err -> (liftIO . atomically . writeTChan outChan) $ buildErrorPacket jobHandle err
+        Left err      -> (liftIO . atomically . writeTChan outChan) $ buildErrorPacket jobHandle err
         Right payload -> (liftIO . atomically . writeTChan outChan) $ buildWorkCompleteReq jobHandle payload
     openWorkerSlot semaphore
   where
-    dataCallback h c payload    = (atomically . writeTChan c) $ buildWorkDataReq h payload
+    dataCallback h c payload    = (atomically . writeTChan c) $ buildWorkDataReq    h payload
     warningCallback h c payload = (atomically . writeTChan c) $ buildWorkWarningReq h payload
-    statusCallback h c status   = (atomically . writeTChan c) $ buildWorkStatusReq h status
+    statusCallback h c status   = (atomically . writeTChan c) $ buildWorkStatusReq  h status
     buildErrorPacket handle err = case err of
         Nothing -> buildWorkFailReq handle
         Just msg -> buildWorkExceptionReq handle msg

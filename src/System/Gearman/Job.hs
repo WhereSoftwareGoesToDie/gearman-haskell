@@ -16,14 +16,13 @@ module System.Gearman.Job
     JobMessage(..)
 ) where
 
-import qualified Data.ByteString.Lazy as S
 import Data.ByteString.Lazy (ByteString)
     
-type JobHandle = S.ByteString
+type JobHandle = ByteString
 
-type JobWarning = S.ByteString
+type JobWarning = ByteString
 
-type JobData = S.ByteString
+type JobData = ByteString
 
 -- |Represents a fraction completed. First element is the numerator, 
 -- second is the denominator.

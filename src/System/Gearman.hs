@@ -13,7 +13,7 @@ module System.Gearman where
 import System.Gearman.Error
 import System.Gearman.Connection
 
-data Gearman a = Gearman {
+newtype Gearman = Gearman {
     conn :: Connection
 }
 

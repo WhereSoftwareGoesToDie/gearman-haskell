@@ -35,7 +35,7 @@ import qualified Data.ByteString.Lazy as L
 import System.Gearman.Error
 import System.Gearman.Protocol
 
-data Connection = Connection {
+newtype Connection = Connection {
     sock :: N.Socket
 }
 
@@ -81,13 +81,13 @@ echo :: Connection -> [L.ByteString] ->  IO (Maybe GearmanError)
 echo Connection{..} payload = do
     sent <- send sock $ L.toStrict req
     let expected = fromIntegral (S.length $ L.toStrict $ req)  
-    case () of _
-                 | (sent == expected) -> do
-                   rep <- recv sock 8
-                   case (S.length $ rep) of 
-                       8 -> return Nothing
-                       x -> return $ Just $ recvError x
-                 | otherwise          -> return $ Just $ sendError sent
+    case (sent == expected) of
+        True -> do
+            rep <- recv sock 8
+            case (S.length $ rep) of 
+                8 -> return Nothing
+                x -> return $ Just $ recvError x                         
+        False -> return $ Just $ sendError sent
   where
     req = buildEchoReq payload
     sendError b = ("echo failed: only sent " ++ (show b) ++ " bytes")
@@ -116,9 +116,9 @@ sendPacket packet = do
     Connection{..} <- ask
     let expected = fromIntegral (S.length $ L.toStrict packet)
     sent <- liftIO $ send sock $ L.toStrict packet
-    case () of _
-                 | (sent == expected) -> return Nothing
-                 | otherwise          -> return $ Just $ sendError sent
+    case (sent == expected) of
+        True  -> return Nothing
+        False -> return $ Just $ sendError sent
   where 
     sendError b = ("send failed: only sent " ++ (show b) ++ " bytes")
 
@@ -132,9 +132,9 @@ recvBytes n = do
 -- Must restart connection if this fails.
 recvPacket :: PacketDomain -> Gearman (Either GearmanError GearmanPacket)
 recvPacket domain = do
-    magicPart <- recvBytes 4
+    magicPart      <- recvBytes 4
     packetTypePart <- recvBytes 4
-    dataSizePart <- recvBytes 4
+    dataSizePart   <- recvBytes 4
     let dataSize = parseDataSize $ L.fromStrict dataSizePart
     argsPart <- if dataSize > 0 then recvBytes dataSize else return ""
-    return $ parsePacket domain (L.fromStrict magicPart) (L.fromStrict packetTypePart) (L.fromStrict dataSizePart) (L.fromStrict argsPart)
+    return $ parsePacket domain (L.fromStrict magicPart) (L.fromStrict packetTypePart) (L.fromStrict dataSizePart) (L.fromStrict argsPart)    

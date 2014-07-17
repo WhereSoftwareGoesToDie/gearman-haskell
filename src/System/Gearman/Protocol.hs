@@ -60,7 +60,6 @@ import System.Gearman.Error
 -- (http://gearman.org/protocol/)
 data PacketMagic = Req | Res | UnknownMagic
 
-
 -- |Whether the packet type is sent/received by a client, a worker, 
 -- both, or is an unused code.
 data PacketDomain = DomainClient | DomainWorker | DomainBoth | DomainNone
@@ -106,15 +105,15 @@ data PacketType =   NullByte
   deriving (Read,Show,Eq,Ord,Enum)
 
 fromWord32 :: Word32 -> Either GearmanError PacketType 
-fromWord32 1 = Right CanDo
-fromWord32 2 = Right CantDo
-fromWord32 3 = Right ResetAbilities
-fromWord32 4 = Right PreSleep
+fromWord32 1  = Right CanDo
+fromWord32 2  = Right CantDo
+fromWord32 3  = Right ResetAbilities
+fromWord32 4  = Right PreSleep
 -- 5 is unused
-fromWord32 6 = Right Noop
-fromWord32 7 = Right SubmitJob
-fromWord32 8 = Right JobCreated
-fromWord32 9 = Right GrabJob
+fromWord32 6  = Right Noop
+fromWord32 7  = Right SubmitJob
+fromWord32 8  = Right JobCreated
+fromWord32 9  = Right GrabJob
 fromWord32 10 = Right NoJob
 fromWord32 11 = Right JobAssign
 fromWord32 12 = Right WorkStatus
@@ -179,7 +178,6 @@ noop                = PacketHeader Noop Res DomainWorker
 
 submitJob           :: PacketHeader
 submitJob           = PacketHeader SubmitJob Res DomainWorker
-
 
 jobCreated          :: PacketHeader
 jobCreated          = PacketHeader JobCreated Req DomainClient
