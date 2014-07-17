@@ -42,10 +42,22 @@ import System.Gearman.Job
 -- |A WorkerFunc is a callback defined by the worker, taking a Job and
 -- returning either an error or some data.
 type WorkerFunc = (Job -> IO (Either JobError L.ByteString))
+type JobResult = Either JobError L.ByteString
 
-data Function m a where
-    Function  :: (L.ByteString -> Either JobError a) -> Function Identity a
-    FunctionM :: (L.ByteString -> m (Either JobError a)) -> Function m a
+data Function m where
+    FunctionPure :: (L.ByteString -> JobResult) -> Function Identity
+    FunctionIO   :: (L.ByteString -> IO JobResult) -> Function IO
+
+runPureFunc :: (Job' j) => Function Identity -> j -> JobResult 
+runPureFunc (FunctionPure f) job  = f (getData job)
+
+runFunc :: (Job' j, Monad m) => Function m -> j -> m JobResult
+runFunc f@(FunctionPure _) job = return $ runPureFunc f job
+runFunc (FunctionIO f) job = f (getData job)
+
+class Job' a where
+    getData :: a -> L.ByteString
+
 
 -- |A Capability is something a worker can do.
 data Capability = Capability {
@@ -61,7 +73,7 @@ newCapability :: L.ByteString ->
                  Worker Capability
 newCapability ident f timeout = do
 --    outChan <- liftIO $ atomically $ newTBChan 1
-    return $ Capability ident f timeout 
+    return $ Capability ident f timeout  
 
 -- |The data passed to a worker function when running a job.
 data Job = Job {
