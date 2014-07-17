@@ -20,7 +20,6 @@ library
                        System.Gearman.Connection
                        System.Gearman.Worker
   other-modules:       System.Gearman.Job
-                       System.Gearman.Util
   build-depends:       base >=4.6,
                        data-endian,
                        bytestring,
