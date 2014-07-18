@@ -19,7 +19,9 @@ module System.Gearman.Connection(
     GearmanAsync(..),
     Gearman,
     sendPacket,
-    recvPacket
+    recvPacket,
+    recvBytes
+
 ) where
 
 import Prelude hiding (length)
@@ -27,6 +29,8 @@ import Control.Applicative
 import Control.Monad.Trans
 import Control.Monad.Reader
 import Control.Concurrent.Async
+import Control.Exception
+import Hexdump
 import qualified Network.Socket as N
 import Network.Socket.ByteString
 import qualified Data.ByteString.Char8 as S
@@ -126,7 +130,9 @@ sendPacket packet = do
 recvBytes :: Int -> Gearman (S.ByteString)
 recvBytes n = do
     Connection{..} <- ask
-    msg <- liftIO $ recvFrom sock n
+    msg <- liftIO $ catch (recvFrom sock n) (\e -> do
+                                                putStrLn $ show (e :: IOException)
+                                                return $ ("", undefined))
     return (fst msg)
 
 -- Must restart connection if this fails.

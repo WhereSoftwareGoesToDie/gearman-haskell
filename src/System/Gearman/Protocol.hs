@@ -36,6 +36,7 @@ module System.Gearman.Protocol
     buildGrabJobUniqReq,
     buildPreSleepReq,
     buildNoopRes,
+    buildSubmitJob,
     parseDataSize,
     parsePacket
 ) where
@@ -177,7 +178,7 @@ noop                :: PacketHeader
 noop                = PacketHeader Noop Res DomainWorker
 
 submitJob           :: PacketHeader
-submitJob           = PacketHeader SubmitJob Res DomainWorker
+submitJob           = PacketHeader SubmitJob Req DomainClient
 
 jobCreated          :: PacketHeader
 jobCreated          = PacketHeader JobCreated Req DomainClient
@@ -314,6 +315,7 @@ parsePacketType d = case (fromWord32 $ runGet getWord32be d) of
         NoJob         -> Right noJob
         JobAssign     -> Right jobAssign
         JobAssignUniq -> Right jobAssignUniq
+        JobCreated    -> Right jobCreated 
         word          -> Left $ "unexpected " ++ (show word)
 
 -- |Takes a 4-bytestring and returns the big-endian word32
@@ -402,6 +404,7 @@ buildWorkDataReq :: J.JobHandle -> J.JobData -> L.ByteString
 buildWorkDataReq handle payload =
     (L.append (renderHeader workDataWorker)) $ packData [handle, payload]
 
+
 -- |Construct a WORK_WARNING packet (same as above, but treated as a 
 -- warning). 
 buildWorkWarningReq :: J.JobHandle -> J.JobData -> L.ByteString
@@ -436,3 +439,9 @@ buildPreSleepReq = L.append (renderHeader preSleep) (packData [])
 -- worker). 
 buildNoopRes :: L.ByteString
 buildNoopRes = L.append (renderHeader noop) (packData [])
+
+
+buildSubmitJob :: L.ByteString -> L.ByteString -> L.ByteString -> L.ByteString
+buildSubmitJob funcName uniqId workload =
+    L.append (renderHeader submitJob) (packData [funcName, uniqId, workload]) 
+

@@ -31,7 +31,8 @@ library
                        containers,
                        async,
                        stm,
-                       stm-chans
+                       stm-chans,
+                       pretty-hex
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -O2
@@ -46,7 +47,8 @@ test-suite             check
                        HUnit,
                        hspec,
                        transformers,
-                       mtl
+                       mtl,
+                       pretty-hex
     hs-source-dirs:    tests
     main-is:           check.hs
     default-language:  Haskell2010

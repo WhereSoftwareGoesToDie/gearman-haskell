@@ -17,6 +17,7 @@ module System.Gearman.Worker
     addFunc,
     Worker,
     runWorker,
+    runWorkAsync,
     work
 ) where
 
@@ -39,7 +40,7 @@ import System.Gearman.Job
 
 -- |A WorkerFunc is a callback defined by the worker, taking a Job and
 -- returning either an error or some data.
-type WorkerFunc = (Job -> IO (Either JobError L.ByteString))
+type WorkerFunc = Job -> IO (Either JobError L.ByteString)
 
 -- |A Capability is something a worker can do.
 data Capability = Capability {
@@ -50,7 +51,7 @@ data Capability = Capability {
 
 -- |Initialize a new Capability from initial job data.
 newCapability :: L.ByteString -> 
-                 (Job -> IO (Either JobError L.ByteString)) -> 
+                 WorkerFunc -> 
                  Maybe Int ->
                  Worker Capability
 newCapability ident f timeout = do
@@ -135,7 +136,7 @@ runWorkAsync (Worker action) = do
 -- |addFunc registers a function with the server as performable by a 
 -- worker.
 addFunc :: L.ByteString ->
-           (Job -> IO (Either JobError L.ByteString)) -> 
+           WorkerFunc -> 
            Maybe Int ->
            Worker (Maybe GearmanError)
 addFunc name f tout = do
