@@ -35,9 +35,7 @@ library
                        pretty-hex
   hs-source-dirs:      src
   default-language:    Haskell2010
-  ghc-options:         -O2
-                       -threaded
-                       -Wall
+  ghc-options:         -Wall
 
 test-suite             check
     type:              exitcode-stdio-1.0

@@ -172,7 +172,7 @@ assignJobUniq pkt = do
     let GearmanPacket{..} = pkt
     let PacketHeader{..} = header
     let spec = case (parseSpecs args) of 
-         Nothing                      -> Left "error: not enough arguments provided to JOB_ASSIGN_UNIQ"
+         Nothing -> Left "error: not enough arguments provided to JOB_ASSIGN_UNIQ"
          Just (handle, fnId, clientId, dataArg) -> case (M.lookup fnId funcMap) of
              Nothing -> Left $  "error: no function with name " ++ (show fnId)
              Just Capability{..}  ->
@@ -199,7 +199,7 @@ assignJob pkt = do
     let GearmanPacket{..} = pkt
     let PacketHeader{..} = header
     let spec = case (parseSpecs args) of 
-         Nothing                      -> Left "error: not enough arguments provided to JOB_ASSIGN"
+         Nothing -> Left "error: not enough arguments provided to JOB_ASSIGN"
          Just (handle, fnId, dataArg) -> case (M.lookup fnId funcMap) of
              Nothing -> Left $  "error: no function with name " ++ (show fnId)
              Just Capability{..}  -> 
@@ -227,9 +227,14 @@ routeIncoming pkt = do
     case packetType of
         JobAssign -> assignJob pkt
         JobAssignUniq -> assignJobUniq pkt
-        NoJob         -> return () -- Server has no work for us, we do nothing; may want to sleep here instead.
+        NoJob         -> do
+            void $ liftIO $ swapMVar processState WorkerSleeping
+            liftIO $ writeSleep outgoingChan -- We will sleep until the server has jobs for us
+            return () -- Server has no work for us, we do nothing; may want to sleep here instead.
         Noop          -> void $ liftIO $ swapMVar processState WorkerConnected
         typ           -> liftIO $ putStrLn $ "Unexpected packet of type " ++ (show typ)
+  where
+    writeSleep      = atomically . flip writeTChan buildPreSleepReq
 
 -- |startWork handles communication with the server, dispatching of 
 -- worker threads and reporting of results.
@@ -266,9 +271,11 @@ openWorkerSlot = atomically . flip writeTBChan  True
 dispatchWorkers :: Worker ()
 dispatchWorkers = forever $ do
     Work{..} <- get
+    liftIO $ threadDelay 10
     st <- liftIO $ readMVar processState
     case st of
         WorkerConnected -> liftIO $ do
+ --           liftIO $ putStrLn "dispatchWorkers thinks worker is connected"
             waitForWorkerSlot workerSemaphore
             writeJobRequest outgoingChan
             openWorkerSlot workerSemaphore
@@ -276,15 +283,12 @@ dispatchWorkers = forever $ do
             if (not noJobs) then do
                 spec <- readJob workerJobChan 
                 async (doWork spec) >>= link
-                return ()
-            else do
-                writeSleep outgoingChan -- We will sleep until the server has jobs for us
-                void $ swapMVar processState WorkerSleeping
-                return ()
-        WorkerSleeping -> liftIO $ threadDelay 1000000 >> return ()
+            else return ()
+        WorkerSleeping -> liftIO $ 
+            threadDelay 1000000 >>
+            return ()
   where
-    writeJobRequest = atomically . flip writeTChan buildGrabJobReq
-    writeSleep      = atomically . flip writeTChan buildPreSleepReq
+    writeJobRequest = atomically . flip writeTChan buildGrabJobReq    
     readJob         = atomically . readTChan
 
 -- |Run a worker with a job. This will block until there are fewer than 
@@ -299,7 +303,8 @@ doWork JobSpec{..} = do
     res <- jobFunc job
     case res of
         Left err      -> (liftIO . atomically . writeTChan outChan) $ buildErrorPacket jobHandle err
-        Right payload -> (liftIO . atomically . writeTChan outChan) $ buildWorkCompleteReq jobHandle payload
+        Right payload -> do
+            (liftIO . atomically . writeTChan outChan) $ buildWorkCompleteReq jobHandle payload
     openWorkerSlot semaphore
   where
     dataCallback h c payload    = (atomically . writeTChan c) $ buildWorkDataReq    h payload

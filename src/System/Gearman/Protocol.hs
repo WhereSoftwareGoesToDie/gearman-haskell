@@ -46,6 +46,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.Word
 import Data.Binary.Put
 import Data.Binary.Get
+import Hexdump
 
 import qualified System.Gearman.Job as J
 import System.Gearman.Error
@@ -64,6 +65,7 @@ data PacketMagic = Req | Res | UnknownMagic
 -- |Whether the packet type is sent/received by a client, a worker, 
 -- both, or is an unused code.
 data PacketDomain = DomainClient | DomainWorker | DomainBoth | DomainNone
+    deriving Show
 
 -- |Packet types, enumerated for 0-36 (and defined for {1-4,6-36}). 
 data PacketType =   NullByte
@@ -315,7 +317,9 @@ parsePacketType d = case (fromWord32 $ runGet getWord32be d) of
         NoJob         -> Right noJob
         JobAssign     -> Right jobAssign
         JobAssignUniq -> Right jobAssignUniq
-        JobCreated    -> Right jobCreated 
+        JobCreated    -> Right jobCreated
+        WorkComplete  -> Right workCompleteWorker
+
         word          -> Left $ "unexpected " ++ (show word)
 
 -- |Takes a 4-bytestring and returns the big-endian word32
@@ -335,7 +339,7 @@ parsePacket :: PacketDomain ->
                Either GearmanError GearmanPacket
 parsePacket domain magic typ dataSize args = do
     case (parseMagic magic) of 
-        UnknownMagic -> Left $ "invalid packet magic"
+        UnknownMagic -> Left $ concat ["invalid packet magic", prettyHex $ L.toStrict magic]
         magic' -> case (parsePacketType typ) of
             Left err -> Left err
             Right typ' -> Right $ GearmanPacket typ'

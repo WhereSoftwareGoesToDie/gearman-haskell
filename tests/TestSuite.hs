@@ -2,6 +2,7 @@
 
 module TestSuite where
 
+import Control.Concurrent
 import Control.Monad
 import Control.Applicative
 import Control.Monad.IO.Class
@@ -36,45 +37,44 @@ testConnectivity = do
 
 
 testHello = do
-    result <- runGearman "localhost" "4730" $ do
-        workerRes <- runWorker 2 (runWorkAsync (registerHello >> work))
-        liftIO $ putStrLn $ show workerRes
-        requestWork
-        a <- receiveResponse
-        liftIO $ putStrLn $ show a
-        b <- receiveResponse
-        liftIO $ putStrLn $ show b
-        c <- receiveResponse
-        liftIO $ putStrLn $ show c
-
-    putStrLn $ concat ["Returned: ", show result]    
-
+    registerFuncsAndWork 1 [registerHello]
+    result <- newEmptyMVar
+    requestWork "hello" "" "" result
+    result' <- readMVar result
+    (Right expected) <- helloFunc undefined
+    checkMatch result' expected
     return ()
 
-workerGrabJob = do
-    liftIO $ putStrLn "Worker asking for work"
-    let request = buildGrabJobReq
-    requestResponse <- sendPacket request
-    if (isJust requestResponse)
-    then liftIO $ putStrLn $ concat ["Asked server for work and it derped: ", show (fromJust requestResponse)]
-    else return ()
+testReverse :: IO ()
+testReverse = do
+    registerFuncsAndWork 1 [registerReverse]
+    result <- newEmptyMVar
+    let input = "this is a string"
+    requestWork "reverse" "" input result
+    result' <- readMVar result
+    let expected = L.reverse input
+    checkMatch result' expected
+    return ()
 
+checkMatch expected received = assertBool (concat ["incorrect output, expected: ", show expected, " , received: ", show received]) (expected == received)
 
-requestWork = do
-    liftIO $ putStrLn "Sending Work Request:"
-    let request = buildSubmitJob "hello" "" "HITHERE"
-    liftIO $ putStrLn $ prettyHex $ L.toStrict request
-    requestResponse <- sendPacket request
-    if (isJust requestResponse)
-    then liftIO $ putStrLn $ concat ["Asked server to run me hello and it derped: ", show (fromJust requestResponse)] 
-     else return ()
+registerFuncsAndWork n funcRegs = do
+    forkIO $ runGearman "localhost" "4730" $ do
+        runWorker n ((sequence_ funcRegs) >> work) >> return ()
+
+requestWork funcName uniqId args resultBox = do
+    forkIO $ runGearman "localhost" "4730" $ do
+        let request = buildSubmitJob funcName uniqId args
+        sendPacket request
+        _ <- receiveResponse
+        ret  <- receiveResponse
+        liftIO $ putMVar resultBox (ret !! 1)
 
 receiveResponse = do 
-    liftIO $ putStrLn "Receiving Response"
     creationResponse <- recvPacket DomainClient 
     case creationResponse of
         Left e -> do
-            liftIO $ putStrLn $ concat ["Asked server to gimme ma response and it derped: ", show e] 
+            liftIO $ putStrLn $ concat ["Asked server to give a response and it died: ", show e] 
             return []
         Right (GearmanPacket _ _ handle) -> do
             return handle
@@ -82,19 +82,23 @@ receiveResponse = do
 registerHello :: Worker (Maybe GearmanError)
 registerHello = addFunc "hello" helloFunc Nothing
 
+registerReverse :: Worker (Maybe GearmanError)
+registerReverse = addFunc "reverse" reverseFunc Nothing
+
 helloFunc :: WorkerFunc
 helloFunc _ = return $ Right "Hello World"
 
---testRegister = do
---    r <- runGearman "localhost" "4370" $ return $ addFunc "reverse" rvs Nothing
---    assertBool "send failed" (isNothing r)
---    return ()
+reverseFunc :: WorkerFunc
+reverseFunc (Job jd _ _ _) = return $ Right $ L.reverse jd
 
 suite :: Spec
 suite = do
     describe "Connectivity" $ do 
         it "connects to a local gearman server on localhost:4730" $ do 
             testConnectivity
-    describe "Basics" $ do
+    describe "Basics - no parameter funcs" $ do
         it "can Hello World!" $ do
             testHello
+    describe "Basics - one parameter funcs" $ do            
+        it "can reverse strings" $ do
+            testReverse
