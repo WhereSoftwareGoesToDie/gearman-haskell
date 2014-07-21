@@ -270,8 +270,7 @@ openWorkerSlot = atomically . flip writeTBChan  True
 
 dispatchWorkers :: Worker ()
 dispatchWorkers = forever $ do
-    Work{..} <- get
-    liftIO $ threadDelay 10
+    Work{..} <- get  
     st <- liftIO $ readMVar processState
     case st of
         WorkerConnected -> liftIO $ do
@@ -283,9 +282,9 @@ dispatchWorkers = forever $ do
             if (not noJobs) then do
                 spec <- readJob workerJobChan 
                 async (doWork spec) >>= link
-            else return ()
-        WorkerSleeping -> liftIO $ 
-            threadDelay 1000000 >>
+            else liftIO $ threadDelay 1000
+        WorkerSleeping -> liftIO $ do 
+            threadDelay 1000000
             return ()
   where
     writeJobRequest = atomically . flip writeTChan buildGrabJobReq    

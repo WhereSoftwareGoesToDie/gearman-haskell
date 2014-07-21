@@ -35,7 +35,7 @@ testConnectivity = do
     assertBool "connect failed" (isNothing c)
     return ()
 
-
+testHello :: IO ()
 testHello = do
     registerFuncsAndWork 1 [registerHello]
     result <- newEmptyMVar
@@ -56,6 +56,29 @@ testReverse = do
     checkMatch result' expected
     return ()
 
+testLoad :: IO ()
+testLoad = do
+--    registerFuncsAndWork 1 [registerHello]
+--    registerFuncsAndWork 1 [registerReverse]
+    let n = 40
+    registerFuncsAndWork 1 [registerHello, registerReverse]
+    let string = "thisIsString"
+    let expectedReverse = replicate n $ L.reverse string
+    let expectedHello = replicate n "Hello World"
+    helloResultBoxes <- sequence (replicate n newEmptyMVar)
+    reverseResultBoxes <- sequence (replicate n newEmptyMVar)
+    mapM_ (requestWork "hello" "" "") helloResultBoxes
+    mapM_ (requestWork "reverse" "" string) reverseResultBoxes
+    helloResults <- mapM readMVar helloResultBoxes
+    reverseResults <- mapM readMVar reverseResultBoxes
+    mapM_ (uncurry checkMatch) (zip expectedHello helloResults)
+    mapM_ (uncurry checkMatch) (zip expectedReverse reverseResults)
+ 
+apply :: [(a -> m b)]-> [a] -> [m b]
+apply [] _ = []
+apply _ [] = []
+apply (f:fs) (x:xs) = (f x):(apply fs xs)
+
 checkMatch expected received = assertBool (concat ["incorrect output, expected: ", show expected, " , received: ", show received]) (expected == received)
 
 registerFuncsAndWork n funcRegs = do
@@ -69,6 +92,7 @@ requestWork funcName uniqId args resultBox = do
         _ <- receiveResponse
         ret  <- receiveResponse
         liftIO $ putMVar resultBox (ret !! 1)
+    return ()
 
 receiveResponse = do 
     creationResponse <- recvPacket DomainClient 
@@ -102,3 +126,6 @@ suite = do
     describe "Basics - one parameter funcs" $ do            
         it "can reverse strings" $ do
             testReverse
+    describe "Efficiency" $ do
+        it "can run 80 simple calls without choking" $ do
+            testLoad
