@@ -19,7 +19,9 @@ module System.Gearman.Connection(
     GearmanAsync(..),
     Gearman,
     sendPacket,
-    recvPacket
+    recvPacket,
+    recvBytes
+
 ) where
 
 import Prelude hiding (length)
@@ -27,6 +29,8 @@ import Control.Applicative
 import Control.Monad.Trans
 import Control.Monad.Reader
 import Control.Concurrent.Async
+import Control.Exception
+import Hexdump
 import qualified Network.Socket as N
 import Network.Socket.ByteString
 import qualified Data.ByteString.Char8 as S
@@ -35,7 +39,9 @@ import qualified Data.ByteString.Lazy as L
 import System.Gearman.Error
 import System.Gearman.Protocol
 
-newtype Connection = Connection {
+data Connection = Connection {
+    connHost :: String,
+    connPort :: String,
     sock :: N.Socket
 }
 
@@ -73,7 +79,7 @@ connect host port = do
         Nothing -> return $ Left $ ("could not resolve address" ++ host)
         Just x  -> do
             N.connect sock $ (N.addrAddress x)
-            return $ Right $ Connection sock
+            return $ Right $ Connection host port sock
 
 -- | echo tests a Connection by sending (and waiting for a response to) an
 --   echo packet. 
@@ -124,14 +130,18 @@ sendPacket packet = do
 
 -- |Receive n bytes from the Gearman server.
 recvBytes :: Int -> Gearman (S.ByteString)
+recvBytes 0 = return ""
 recvBytes n = do
     Connection{..} <- ask
-    msg <- liftIO $ recvFrom sock n
-    return (fst msg)
+    msg <- liftIO $ catch (recvFrom sock n) (\e -> do
+                                                putStrLn $ "recvBytes caught: " ++ show (e :: IOException)
+                                                return $ ("", undefined))
+    return $ fst msg
 
 -- Must restart connection if this fails.
 recvPacket :: PacketDomain -> Gearman (Either GearmanError GearmanPacket)
 recvPacket domain = do
+    Connection{..} <- ask
     magicPart      <- recvBytes 4
     packetTypePart <- recvBytes 4
     dataSizePart   <- recvBytes 4
