@@ -9,7 +9,7 @@ import Control.Monad.IO.Class
 import Data.Either
 import Data.Maybe
 import Hexdump
-import Test.Hspec 
+import Test.Hspec
 import Test.Hspec.HUnit
 import Test.HUnit
 import qualified Data.ByteString.Char8 as S
@@ -20,13 +20,13 @@ import System.Gearman.Error
 import System.Gearman.Protocol
 import System.Gearman.Worker
 
--- | testConnectEcho connects to the provided host and port, sends a simple 
+-- | testConnectEcho connects to the provided host and port, sends a simple
 --   ECHO_REQ packet, and verifies the result. Returns Nothing on success,
 --   Just GearmanError on failure.
 testConnectEcho :: String -> String -> IO (Maybe GearmanError)
 testConnectEcho h p = do
     c <- connect h p
-    case c of 
+    case c of
         Left x  -> return $ Just x
         Right x -> echo x ["ping"]
 
@@ -73,7 +73,7 @@ testLoad = do
     reverseResults <- mapM readMVar reverseResultBoxes
     mapM_ (uncurry checkMatch) (zip expectedHello helloResults)
     mapM_ (uncurry checkMatch) (zip expectedReverse reverseResults)
- 
+
 apply :: [(a -> m b)]-> [a] -> [m b]
 apply [] _ = []
 apply _ [] = []
@@ -94,11 +94,11 @@ requestWork funcName uniqId args resultBox = do
         liftIO $ putMVar resultBox (ret !! 1)
     return ()
 
-receiveResponse = do 
-    creationResponse <- recvPacket DomainClient 
+receiveResponse = do
+    creationResponse <- recvPacket DomainClient
     case creationResponse of
         Left e -> do
-            liftIO $ putStrLn $ concat ["Asked server to give a response and it died: ", show e] 
+            liftIO $ putStrLn $ concat ["Asked server to give a response and it died: ", show e]
             return []
         Right (GearmanPacket _ _ handle) -> do
             return handle
@@ -117,13 +117,13 @@ reverseFunc (Job jd _ _ _) = return $ Right $ L.reverse jd
 
 suite :: Spec
 suite = do
-    describe "Connectivity" $ do 
-        it "connects to a local gearman server on localhost:4730" $ do 
+    describe "Connectivity" $ do
+        it "connects to a local gearman server on localhost:4730" $ do
             testConnectivity
     describe "Basics - no parameter funcs" $ do
         it "can Hello World!" $ do
             testHello
-    describe "Basics - one parameter funcs" $ do            
+    describe "Basics - one parameter funcs" $ do
         it "can reverse strings" $ do
             testReverse
     describe "Efficiency" $ do

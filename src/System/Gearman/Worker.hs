@@ -1,7 +1,7 @@
 -- This file is part of gearman-haskell.
 --
 -- Copyright 2014 Anchor Systems Pty Ltd and others.
--- 
+--
 -- The code in this file, and the program it is a part of, is made
 -- available to you by its authors as open source software: you can
 -- redistribute it and/or modify it under the terms of the BSD license.
@@ -50,13 +50,13 @@ data Capability = Capability {
 }
 
 -- |Initialize a new Capability from initial job data.
-newCapability :: L.ByteString -> 
-                 WorkerFunc -> 
+newCapability :: L.ByteString ->
+                 WorkerFunc ->
                  Maybe Int ->
                  Worker Capability
 newCapability ident f timeout = do
 --    outChan <- liftIO $ atomically $ newTBChan 1
-    return $ Capability ident f timeout 
+    return $ Capability ident f timeout
 
 -- |The data passed to a worker function when running a job.
 data Job = Job {
@@ -77,16 +77,16 @@ data JobSpec = JobSpec {
     clientId    :: Maybe L.ByteString
 }
 
--- Error returned by a job. A Nothing will be sent as a WORK_FAIL 
+-- Error returned by a job. A Nothing will be sent as a WORK_FAIL
 -- packet; Just err will be sent as a WORK_EXCEPTION packet with err
 -- as the data argument.
 type JobError = Maybe L.ByteString
 
--- |Maintained by the controller, defines the mapping between 
+-- |Maintained by the controller, defines the mapping between
 -- function identifiers read from the server and Haskell functions.
 type FuncMap = Map L.ByteString Capability
 
--- |Whether the worker is dormant because there's nothing for it to do 
+-- |Whether the worker is dormant because there's nothing for it to do
 -- or not.
 data WorkerState = WorkerConnected | WorkerSleeping
     deriving (Show, Eq)
@@ -111,7 +111,7 @@ newtype Worker a = Worker (StateT Work Gearman a)
 liftGearman :: Gearman a -> Worker a
 liftGearman = Worker . lift
 
--- Runs an action in the Worker monad using the specified number of 
+-- Runs an action in the Worker monad using the specified number of
 -- worker threads to execute jobs.
 runWorker :: Int -> Worker a -> Gearman a
 runWorker nWorkers (Worker action) = do
@@ -133,10 +133,10 @@ runWorkAsync (Worker action) = do
     w <- get
     liftGearman $ runGearmanAsync $ evalStateT action w
 
--- |addFunc registers a function with the server as performable by a 
+-- |addFunc registers a function with the server as performable by a
 -- worker.
 addFunc :: L.ByteString ->
-           WorkerFunc -> 
+           WorkerFunc ->
            Maybe Int ->
            Worker (Maybe GearmanError)
 addFunc name f tout = do
@@ -145,33 +145,32 @@ addFunc name f tout = do
     let packet = case timeout of
                     Nothing -> buildCanDoReq ident
                     Just t  -> buildCanDoTimeoutReq ident t
-    put $ Work (M.insert ident cap funcMap) 
-               nWorkers 
-               outgoingChan 
-               incomingChan 
-               workerSemaphore 
-               workerJobChan 
+    put $ Work (M.insert ident cap funcMap)
+               nWorkers
+               outgoingChan
+               incomingChan
+               workerSemaphore
+               workerJobChan
                processState
     liftGearman $ sendPacket packet
 
--- |Receiver handles incoming packets. 
-receiver :: TChan GearmanPacket -> Gearman ()
-receiver chan = forever $ do
-    incoming <- recvPacket DomainWorker
-    case incoming of 
+-- |Receiver handles incoming packets.
+receiver :: Worker ()
+receiver = forever $ do
+    incoming <- liftGearman . recvPacket $ DomainWorker
+    case incoming of
         Left err -> liftIO $ putStrLn (show err)
-        Right pkt -> liftIO $ atomically $ writeTChan chan pkt
-    return ()
+        Right pkt -> routeIncoming pkt
 
 
--- |Given an ASSIGN_JOB or ASSIGN_JOB_UNIQ packet, give the job to a worker 
+-- |Given an ASSIGN_JOB or ASSIGN_JOB_UNIQ packet, give the job to a worker
 -- thread.
 assignJobUniq :: GearmanPacket -> Worker ()
 assignJobUniq pkt = do
     Work{..} <- get
     let GearmanPacket{..} = pkt
     let PacketHeader{..} = header
-    let spec = case (parseSpecs args) of 
+    let spec = case (parseSpecs args) of
          Nothing -> Left "error: not enough arguments provided to JOB_ASSIGN_UNIQ"
          Just (handle, fnId, clientId, dataArg) -> case (M.lookup fnId funcMap) of
              Nothing -> Left $  "error: no function with name " ++ (show fnId)
@@ -179,11 +178,11 @@ assignJobUniq pkt = do
                 Right $ JobSpec dataArg
                                 fnId
                                 func
-                                outgoingChan                           
+                                outgoingChan
                                 workerSemaphore
                                 handle
                                 (Just clientId)
-    case spec of 
+    case spec of
         Left err -> liftIO $ putStrLn err
         Right js -> do
             liftIO $ atomically $ writeTChan workerJobChan js
@@ -191,26 +190,26 @@ assignJobUniq pkt = do
     parseSpecs (handle:fnId:clientId:dataArg:_) = Just (handle, fnId, clientId, dataArg)
     parseSpecs _                                = Nothing
 
--- |Given an ASSIGN_JOB or ASSIGN_JOB_UNIQ packet, give the job to a worker 
+-- |Given an ASSIGN_JOB or ASSIGN_JOB_UNIQ packet, give the job to a worker
 -- thread.
 assignJob :: GearmanPacket -> Worker ()
 assignJob pkt = do
     Work{..} <- get
     let GearmanPacket{..} = pkt
     let PacketHeader{..} = header
-    let spec = case (parseSpecs args) of 
+    let spec = case (parseSpecs args) of
          Nothing -> Left "error: not enough arguments provided to JOB_ASSIGN"
          Just (handle, fnId, dataArg) -> case (M.lookup fnId funcMap) of
              Nothing -> Left $  "error: no function with name " ++ (show fnId)
-             Just Capability{..}  -> 
+             Just Capability{..}  ->
                  Right $ JobSpec dataArg
                                  fnId
                                  func
-                                 outgoingChan                           
+                                 outgoingChan
                                  workerSemaphore
                                  handle
                                  Nothing
-    case spec of 
+    case spec of
         Left err -> liftIO $ putStrLn err
         Right js -> do
             liftIO $ atomically $ writeTChan workerJobChan js
@@ -236,41 +235,37 @@ routeIncoming pkt = do
   where
     writeSleep      = atomically . flip writeTChan buildPreSleepReq
 
--- |startWork handles communication with the server, dispatching of 
+-- |startWork handles communication with the server, dispatching of
 -- worker threads and reporting of results.
 work :: Worker ()
 work = do
     Work{..} <- get
     runWorkAsync dispatchWorkers
-    liftGearman $ runGearmanAsync (receiver incomingChan)
+    runWorkAsync receiver
     forever $ do
         gotOut <- (liftIO . noMessages) outgoingChan >>= (return . not)
-        case gotOut of 
+        case gotOut of
             False -> return ()
             True  -> readMessage outgoingChan >>= sendMessage
-        gotIn <- (liftIO . noMessages) incomingChan >>= (return . not)
-        case gotIn of
-            False -> return ()
-            True  -> readMessage incomingChan >>= routeIncoming
         liftIO $ threadDelay 10000
   where
     noMessages  = liftIO . atomically . isEmptyTChan
     readMessage = liftIO . atomically . readTChan
     sendMessage msg = do
         res <- liftGearman $ sendPacket msg
-        case res of 
+        case res of
             Nothing  -> return ()
             Just err -> liftIO $ printError err
 
 waitForWorkerSlot :: TBChan Bool -> IO ()
-waitForWorkerSlot = void . atomically . readTBChan 
+waitForWorkerSlot = void . atomically . readTBChan
 
 openWorkerSlot :: TBChan Bool -> IO ()
 openWorkerSlot = atomically . flip writeTBChan  True
 
 dispatchWorkers :: Worker ()
 dispatchWorkers = forever $ do
-    Work{..} <- get  
+    Work{..} <- get
     st <- liftIO $ readMVar processState
     case st of
         WorkerConnected -> liftIO $ do
@@ -280,17 +275,17 @@ dispatchWorkers = forever $ do
             openWorkerSlot workerSemaphore
             noJobs <- (atomically . isEmptyTChan) workerJobChan
             if (not noJobs) then do
-                spec <- readJob workerJobChan 
+                spec <- readJob workerJobChan
                 async (doWork spec) >>= link
             else liftIO $ threadDelay 1000
-        WorkerSleeping -> liftIO $ do 
+        WorkerSleeping -> liftIO $ do
             threadDelay 1000000
             return ()
   where
-    writeJobRequest = atomically . flip writeTChan buildGrabJobReq    
+    writeJobRequest = atomically . flip writeTChan buildGrabJobReq
     readJob         = atomically . readTChan
 
--- |Run a worker with a job. This will block until there are fewer than 
+-- |Run a worker with a job. This will block until there are fewer than
 -- nWorkers running, and terminate when complete.
 doWork :: JobSpec -> IO ()
 doWork JobSpec{..} = do
