@@ -1,5 +1,5 @@
 name:                gearman-haskell
-version:             1.0.0
+version:             0.2.0
 synopsis:            Haskell implementation of the Gearman protocol.
 -- description:         
 homepage:            https://github.com/anchor/gearman-haskell

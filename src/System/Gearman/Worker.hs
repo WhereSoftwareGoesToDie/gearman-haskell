@@ -32,9 +32,12 @@ import System.Gearman.Connection
 import System.Gearman.Protocol
 import System.Gearman.Job
 
+-- |Used in jobs with timeouts to indicate whether the function
+-- timed out or successfully completed in time
 data TimedResult = Timeout
                  | Result JobResult
 
+-- |A function can either throw some sort of error, or return a successful payload
 type JobResult = Either JobError L.ByteString
 
 -- |A WorkerFunc is a callback defined by the worker, taking a Job and
@@ -75,6 +78,10 @@ data JobSpec = JobSpec {
     jobHandle   :: L.ByteString
 }
 
+-- | Takes in a list of (identifier, implementation, maybe timeouts) triples
+-- If registration fails for any of the functions, processFuncs returns a
+-- list of error messages, one for each failed registration.
+-- If registration succeeds for all functions, returns the aggregate funcMap
 processFuncs :: [(L.ByteString, WorkerFunc, Maybe Int)] -> Gearman (Either [String] FuncMap)
 processFuncs funcs = do
     (errors, funcMaps) <- (liftM partitionEithers) (mapM processFunc funcs)
@@ -82,18 +89,21 @@ processFuncs funcs = do
         return $ Right (M.unions funcMaps)
     else
         return $ Left errors
+  where
+    processFunc (ident, func, timeout) = do
+        packet <- case timeout of
+            Nothing -> return $ buildCanDoReq ident
+            Just t  -> return $ buildCanDoTimeoutReq ident t
+        let funcMap = M.singleton ident (Capability func timeout)
+        resp <- sendPacket packet
+        case resp of
+            Nothing  -> return $ Right funcMap
+            Just err -> return $ Left $ "function registration failed: " ++ err
 
-processFunc :: (L.ByteString, WorkerFunc, Maybe Int) -> Gearman (Either String FuncMap)
-processFunc (ident, func, timeout) = do
-    packet <- case timeout of
-        Nothing -> return $ buildCanDoReq ident
-        Just t  -> return $ buildCanDoTimeoutReq ident t
-    let funcMap = M.singleton ident (Capability func timeout)
-    resp <- sendPacket packet
-    case resp of
-        Nothing  -> return $ Right funcMap
-        Just err -> return $ Left $ "function registration failed: " ++ err
-
+-- |Executes the given JOB_ASSIGn packet
+-- If anything fails at any stage, it returns the error message
+-- Manages sending all job status/complete/etc. messages
+-- Does NOT send another GRAB_JOB
 completeJob :: GearmanPacket -> FuncMap -> Gearman (Maybe String)
 completeJob pkt funcMap = do
     case parseJob pkt funcMap of
@@ -125,8 +135,9 @@ completeJob pkt funcMap = do
                     case maybeResult of
                         Nothing -> return Nothing
                         Just result -> liftIO $ handleResult job result
-                    
   where
+    --killThread throws a ThreadKilled exception
+    --We expect this and simply ignore it
     niceKillThread thread =
         catch (killThread thread) ((\_ -> return ()) :: IOException -> IO())
     handleResult Job{..} (Left jobErr) = do
@@ -135,6 +146,7 @@ completeJob pkt funcMap = do
             Just jobException -> sendException jobException
     handleResult Job{..} (Right payload) = sendComplete payload
 
+-- |Builds a Job with the appropriate packet sending functions from a JobSpec
 createJob :: JobSpec -> Gearman Job
 createJob JobSpec{..} = do
     connection <- ask
@@ -146,6 +158,10 @@ createJob JobSpec{..} = do
                  (sendPacketIO connection $ buildWorkFailReq jobHandle)
                  (sendPacketIO connection . buildWorkCompleteReq jobHandle)
 
+-- |Parses a JobSpec from a JOB_ASSIGN packet and FuncMap
+-- If the parsing fails or the requested function hasn't been registered
+-- it returns an appropriate error message
+-- Otherwise it returns the successfully parsed JobSpec
 parseJob :: GearmanPacket -> FuncMap -> Either String JobSpec
 parseJob GearmanPacket{..} funcMap =
     let PacketHeader{..} = header in
@@ -159,7 +175,12 @@ parseJob GearmanPacket{..} funcMap =
     parseSpecs (jobHandle:fnId:dataArg:_) = Just (jobHandle, fnId, dataArg)
     parseSpecs _                       = Nothing
 
--- | Give this a list of func triples and this does all the things
+-- | Entry point into this module
+-- Takes in a list of (identifier, implementation, maybe timeouts) triples,
+-- registers the functions parsed from the triples, then starts the main work loop
+-- sends an initial GRAB_JOB packet before entering the loop
+-- if the work loop returns an error/disconnection message or any of the setup fails
+-- it returns the message
 work :: [(L.ByteString, WorkerFunc, Maybe Int)] -> Gearman String
 work funcs = do
     funcReg <- processFuncs funcs
@@ -171,7 +192,7 @@ work funcs = do
                 Just err -> return err
                 Nothing -> loop funcMap
 
--- | The bit that REALLY does all the things
+-- | The core work loop.
 -- Returns a String when it terminates, stating why it terminated
 loop :: FuncMap -> Gearman String
 loop funcMap = do
@@ -197,4 +218,4 @@ loop funcMap = do
                 wat           -> return $ "Unexpected packet of type " ++ (show wat)
   where
     handleResponse (Just err) = return err
-    handleResponse Nothing    = loop funcMap  
+    handleResponse Nothing    = loop funcMap
