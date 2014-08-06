@@ -18,7 +18,7 @@ module System.Gearman.Worker
 ) where
 
 import Control.Concurrent
-import Control.Exception
+import Control.Concurrent.Async
 import Control.Monad
 import Control.Monad.Reader
 import qualified Data.ByteString.Lazy as L
@@ -31,11 +31,6 @@ import System.Gearman.Error
 import System.Gearman.Connection
 import System.Gearman.Protocol
 import System.Gearman.Job
-
--- |Used in jobs with timeouts to indicate whether the function
--- timed out or successfully completed in time
-data TimedResult = Timeout
-                 | Result JobResult
 
 -- |A function can either throw some sort of error, or return a successful payload
 type JobResult = Either JobError L.ByteString
@@ -111,35 +106,16 @@ completeJob pkt funcMap = do
         Right jobSpec@JobSpec{..} -> do
             job@Job{..} <- createJob jobSpec
             let Capability{..} = fromJust $ M.lookup jobName funcMap
-            case timeout of
-                Nothing -> liftIO $ do
+            liftIO $ case timeout of
+                Nothing -> do
                     result <- func job
                     handleResult job result
                 Just t -> do
-                    maybeResult <- do
-                        raceBox <- liftIO $ newEmptyMVar
-                        timerThread <- liftIO $ forkIO $ do
-                            threadDelay (t * 1000000)
-                            putMVar raceBox Timeout
-                        workerThread <- liftIO $ forkIO $ do
-                            result <- func job
-                            putMVar raceBox $ Result result
-                        winner <- liftIO $ takeMVar raceBox
-                        case winner of
-                            Timeout -> do
-                                liftIO $ niceKillThread workerThread
-                                return Nothing
-                            Result result -> do
-                                liftIO $ niceKillThread timerThread
-                                return $ Just result
-                    case maybeResult of
-                        Nothing -> return Nothing
-                        Just result -> liftIO $ handleResult job result
+                        timer <- async (threadDelay (t * 1000000))
+                        worker <- async (func job)
+                        winner <- waitEither timer worker
+                        either (\_ -> return Nothing) (handleResult job) winner
   where
-    --killThread throws a ThreadKilled exception
-    --We expect this and simply ignore it
-    niceKillThread thread =
-        catch (killThread thread) ((\_ -> return ()) :: IOException -> IO())
     handleResult Job{..} (Left jobErr) = do
         case jobErr of
             Nothing -> sendFailure
