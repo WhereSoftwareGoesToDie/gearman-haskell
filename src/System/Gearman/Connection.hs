@@ -19,6 +19,7 @@ module System.Gearman.Connection(
     GearmanAsync(..),
     Gearman,
     sendPacket,
+    sendPacketIO,
     recvPacket,
     recvBytes
 
@@ -115,18 +116,22 @@ runGearman host port (Gearman action) = do
             liftIO $ cleanup x
             return r
 
--- |Send a packet to the Gearman server. Treats bytes as opaque, does
--- not do any serialisation. 
-sendPacket :: L.ByteString -> Gearman (Maybe GearmanError)
-sendPacket packet = do
-    Connection{..} <- ask
+sendPacketIO :: Connection -> L.ByteString -> IO (Maybe GearmanError)
+sendPacketIO Connection{..} packet = do    
     let expected = fromIntegral (S.length $ L.toStrict packet)
-    sent <- liftIO $ send sock $ L.toStrict packet
+    sent <- send sock $ L.toStrict packet
     case (sent == expected) of
         True  -> return Nothing
         False -> return $ Just $ sendError sent
   where 
     sendError b = ("send failed: only sent " ++ (show b) ++ " bytes")
+
+-- |Send a packet to the Gearman server. Treats bytes as opaque, does
+-- not do any serialisation. 
+sendPacket :: L.ByteString -> Gearman (Maybe GearmanError)
+sendPacket packet = do
+    connection <- ask
+    liftIO $ sendPacketIO connection packet
 
 -- |Receive n bytes from the Gearman server.
 recvBytes :: Int -> Gearman (S.ByteString)

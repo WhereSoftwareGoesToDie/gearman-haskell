@@ -61,7 +61,7 @@ import System.Gearman.Error
 --
 -- (http://gearman.org/protocol/)
 data PacketMagic = Req | Res | UnknownMagic
-
+    deriving Show
 -- |Whether the packet type is sent/received by a client, a worker, 
 -- both, or is an unused code.
 data PacketDomain = DomainClient | DomainWorker | DomainBoth | DomainNone
@@ -152,14 +152,14 @@ data PacketHeader = PacketHeader {
     packetType :: PacketType,
     magic      :: PacketMagic,
     domain     :: PacketDomain
-}
+} deriving Show
 
 -- |Full Gearman packet.
 data GearmanPacket = GearmanPacket {
     header   :: PacketHeader,
     dataSize :: Int,
     args     :: [L.ByteString]
-}
+} deriving Show
 
 canDo               :: PacketHeader
 canDo               = PacketHeader CanDo Req DomainWorker
@@ -408,7 +408,6 @@ buildWorkDataReq :: J.JobHandle -> J.JobData -> L.ByteString
 buildWorkDataReq handle payload =
     (L.append (renderHeader workDataWorker)) $ packData [handle, payload]
 
-
 -- |Construct a WORK_WARNING packet (same as above, but treated as a 
 -- warning). 
 buildWorkWarningReq :: J.JobHandle -> J.JobData -> L.ByteString
@@ -444,7 +443,8 @@ buildPreSleepReq = L.append (renderHeader preSleep) (packData [])
 buildNoopRes :: L.ByteString
 buildNoopRes = L.append (renderHeader noop) (packData [])
 
-
+-- | Construct a SUBMIT_JOB packet (sent by the client to request
+-- work to be done.
 buildSubmitJob :: L.ByteString -> L.ByteString -> L.ByteString -> L.ByteString
 buildSubmitJob funcName uniqId workload =
     L.append (renderHeader submitJob) (packData [funcName, uniqId, workload]) 
