@@ -17,8 +17,6 @@ module System.Gearman.Worker
     work
 ) where
 
-import Control.Concurrent
-import Control.Concurrent.Async
 import Control.Monad
 import Control.Monad.Reader
 import qualified Data.ByteString.Lazy as L
@@ -26,7 +24,7 @@ import Data.Either
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
-
+import qualified System.Timeout as System(timeout)
 import System.Gearman.Error
 import System.Gearman.Connection
 import System.Gearman.Protocol
@@ -111,10 +109,8 @@ completeJob pkt funcMap = do
                     result <- func job
                     handleResult job result
                 Just t -> do
-                        timer <- async (threadDelay (t * 1000000))
-                        worker <- async (func job)
-                        winner <- waitEither timer worker
-                        either (\_ -> return Nothing) (handleResult job) winner
+                    result <- System.timeout t (func job)
+                    maybe (return Nothing) (handleResult job) result
   where
     handleResult Job{..} (Left jobErr) = do
         case jobErr of
