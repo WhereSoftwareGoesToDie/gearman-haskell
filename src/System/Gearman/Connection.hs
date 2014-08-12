@@ -25,12 +25,13 @@ module System.Gearman.Connection(
 
 ) where
 
-import Prelude hiding (length)
+import Prelude
 import Control.Applicative
 import Control.Monad.Trans
 import Control.Monad.Reader
 import Control.Concurrent.Async
 import Control.Exception
+import Data.Either
 import Hexdump
 import qualified Network.Socket as N
 import Network.Socket.ByteString
@@ -46,8 +47,9 @@ data Connection = Connection {
     sock :: N.Socket
 }
 
-newtype Gearman a = Gearman (ReaderT Connection IO a)
-    deriving (Functor, Applicative, Monad, MonadIO, MonadReader Connection)
+newtype Gearman a = Gearman {
+    unGearman :: (ReaderT Connection IO a)
+} deriving (Functor, Applicative, Monad, MonadIO, MonadReader Connection)
 
 newtype GearmanAsync a = GearmanAsync (ReaderT Connection IO a)
     deriving (Functor, Applicative, Monad, MonadIO, MonadReader Connection)
@@ -134,22 +136,38 @@ sendPacket packet = do
     liftIO $ sendPacketIO connection packet
 
 -- |Receive n bytes from the Gearman server.
-recvBytes :: Int -> Gearman (S.ByteString)
-recvBytes 0 = return ""
+recvBytes :: Int -> Gearman (Either GearmanError S.ByteString)
+recvBytes 0 = return $ Right ""
 recvBytes n = do
     Connection{..} <- ask
-    msg <- liftIO $ catch (recvFrom sock n) (\e -> do
-                                                putStrLn $ "recvBytes caught: " ++ show (e :: IOException)
-                                                return $ ("", undefined))
-    return $ fst msg
+    msg <- liftIO $ catch (eitherRecvFrom sock n) handleFailure
+    case msg of
+        Left err -> return $ Left err
+        Right (bytes, _) -> return $ Right bytes
+  where
+    eitherRecvFrom sock n = do
+        result <- recvFrom sock n
+        return $ Right result
+    handleFailure e = return $ Left $ show (e :: IOException)
 
 -- Must restart connection if this fails.
 recvPacket :: PacketDomain -> Gearman (Either GearmanError GearmanPacket)
 recvPacket domain = do
-    Connection{..} <- ask
+    conn@Connection{..} <- ask
     magicPart      <- recvBytes 4
     packetTypePart <- recvBytes 4
     dataSizePart   <- recvBytes 4
-    let dataSize = parseDataSize $ L.fromStrict dataSizePart
-    argsPart <- if dataSize > 0 then recvBytes dataSize else return ""
-    return $ parsePacket domain (L.fromStrict magicPart) (L.fromStrict packetTypePart) (L.fromStrict dataSizePart) (L.fromStrict argsPart)    
+    let headerParts = [magicPart, packetTypePart, dataSizePart]
+    let errs = lefts headerParts
+    if (length errs /= 0)
+    then return $ Left $ "recvPacket failed to receieve header. Errors: " ++ concatMap show errs
+    else do
+        let [magicPart', packetTypePart', dataSizePart'] = rights headerParts
+        let dataSize = parseDataSize $ L.fromStrict dataSizePart'
+        argsPart <- if dataSize > 0
+                    then recvBytes dataSize
+                    else return $ Right ""
+        case argsPart of
+            Left err -> return $ Left $ "recvPacket failed to receive payload: " ++ err
+            Right argsPart' -> do
+                return $ parsePacket domain (L.fromStrict magicPart') (L.fromStrict packetTypePart') (L.fromStrict dataSizePart') (L.fromStrict argsPart')
