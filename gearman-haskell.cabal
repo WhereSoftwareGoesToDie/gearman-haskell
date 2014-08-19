@@ -1,5 +1,5 @@
 name:                gearman-haskell
-version:             0.2.1
+version:             0.3.1
 synopsis:            Haskell implementation of the Gearman protocol.
 -- description:         
 homepage:            https://github.com/anchor/gearman-haskell
@@ -14,8 +14,7 @@ extra-source-files:  README.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     System.Gearman
-                       System.Gearman.Error
+  exposed-modules:     System.Gearman.Error
                        System.Gearman.Protocol
                        System.Gearman.Connection
                        System.Gearman.Worker
@@ -25,7 +24,7 @@ library
                        bytestring,
                        binary,
                        HTTP,
-                       network,
+                       network < 2.6,
                        transformers,
                        mtl,
                        containers,

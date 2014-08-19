@@ -7,7 +7,6 @@
 -- redistribute it and/or modify it under the terms of the BSD license.
 
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module System.Gearman.Worker
 (
@@ -55,12 +54,12 @@ data Capability = Capability {
 -- |The data passed to a worker function when running a job.
 data Job = Job {
     jobData       :: L.ByteString,
-    sendWarning   :: (L.ByteString -> IO (Maybe GearmanError)),
-    sendData      :: (L.ByteString -> IO (Maybe GearmanError)),
-    sendStatus    :: (JobStatus    -> IO (Maybe GearmanError)),
-    sendException :: (L.ByteString -> IO (Maybe GearmanError)),
-    sendFailure   :: (IO (Maybe GearmanError)),
-    sendComplete  :: (L.ByteString -> IO (Maybe GearmanError))
+    sendWarning   :: L.ByteString -> IO (Maybe GearmanError),
+    sendData      :: L.ByteString -> IO (Maybe GearmanError),
+    sendStatus    :: JobStatus    -> IO (Maybe GearmanError),
+    sendException :: L.ByteString -> IO (Maybe GearmanError),
+    sendFailure   :: IO (Maybe GearmanError),
+    sendComplete  :: L.ByteString -> IO (Maybe GearmanError)
 }
 
 -- |The data passed to a worker when a job is received.
@@ -77,11 +76,11 @@ data JobSpec = JobSpec {
 -- If registration succeeds for all functions, returns the aggregate funcMap
 processFuncs :: [(L.ByteString, WorkerFunc, Maybe Int)] -> Gearman (Either [String] FuncMap)
 processFuncs funcs = do
-    (errors, funcMaps) <- (liftM partitionEithers) (mapM processFunc funcs)
-    if (null errors) then
-        return $ Right (M.unions funcMaps)
+    (errors, funcMaps) <- liftM partitionEithers (mapM processFunc funcs)
+    return $ if null errors then
+        Right (M.unions funcMaps)
     else
-        return $ Left errors
+        Left errors
   where
     processFunc (ident, func, timeout) = do
         packet <- case timeout of
@@ -98,7 +97,7 @@ processFuncs funcs = do
 -- Manages sending all job status/complete/etc. messages
 -- Does NOT send another GRAB_JOB
 completeJob :: GearmanPacket -> FuncMap -> Gearman (Maybe String)
-completeJob pkt funcMap = do
+completeJob pkt funcMap =
     case parseJob pkt funcMap of
         Left err -> return $ Just err
         Right jobSpec@JobSpec{..} -> do
@@ -112,7 +111,7 @@ completeJob pkt funcMap = do
                     result <- System.timeout t (func job)
                     maybe (return Nothing) (handleResult job) result
   where
-    handleResult Job{..} (Left jobErr) = do
+    handleResult Job{..} (Left jobErr) =
         case jobErr of
             Nothing -> sendFailure
             Just jobException -> sendException jobException
@@ -137,10 +136,10 @@ createJob JobSpec{..} = do
 parseJob :: GearmanPacket -> FuncMap -> Either String JobSpec
 parseJob GearmanPacket{..} funcMap =
     let PacketHeader{..} = header in
-    case (parseSpecs args) of
+    case parseSpecs args of
         Nothing -> Left "not enough arguments provided to JOB_ASSIGN"
-        Just (jobHandle, fnId, dataArg) -> case (M.lookup fnId funcMap) of
-            Nothing -> Left $ "no function with name " ++ (show fnId)
+        Just (jobHandle, fnId, dataArg) -> case M.lookup fnId funcMap of
+            Nothing -> Left $ "no function with name " ++ show fnId
             Just Capability{..} ->
                 Right $ JobSpec dataArg fnId func jobHandle
   where
@@ -157,7 +156,7 @@ work :: [(L.ByteString, WorkerFunc, Maybe Int)] -> Gearman String
 work funcs = do
     funcReg <- processFuncs funcs
     case funcReg of
-        Left errs -> return $ concat ["Failed to register functions, errors: ", concat errs]
+        Left errs -> return $ "Failed to register functions, errors: " ++ concat errs
         Right funcMap -> do
             resp <- sendPacket buildGrabJobReq
             case resp of
@@ -187,7 +186,7 @@ loop funcMap = do
                             resp <- sendPacket buildGrabJobReq
                             handleResponse resp
                         Just err -> return err
-                wat           -> return $ "Unexpected packet of type " ++ (show wat)
+                wat           -> return $ "Unexpected packet of type " ++ show wat
   where
     handleResponse (Just err) = return err
     handleResponse Nothing    = loop funcMap
