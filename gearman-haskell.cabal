@@ -1,5 +1,5 @@
 name:                gearman-haskell
-version:             0.3.0
+version:             0.3.1
 synopsis:            Haskell implementation of the Gearman protocol.
 -- description:         
 homepage:            https://github.com/anchor/gearman-haskell
@@ -24,7 +24,7 @@ library
                        bytestring,
                        binary,
                        HTTP,
-                       network,
+                       network < 2.6,
                        transformers,
                        mtl,
                        containers,
