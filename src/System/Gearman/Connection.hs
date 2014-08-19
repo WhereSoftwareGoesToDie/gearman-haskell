@@ -157,7 +157,7 @@ recvPacket domain = do
     dataSizePart   <- recvBytes 4
     let headerParts = [magicPart, packetTypePart, dataSizePart]
     let errs = lefts headerParts
-    if null errs
+    if not $ null errs
     then return $ Left $ "recvPacket failed to receieve header. Errors: " ++ concatMap show errs
     else do
         let [magicPart', packetTypePart', dataSizePart'] = rights headerParts
